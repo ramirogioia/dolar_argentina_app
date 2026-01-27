@@ -26,21 +26,21 @@ class HomeHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final logoSize =
-        screenWidth * 0.55; // Logo grande pero optimizado (55% del ancho)
+        screenWidth * 0.30; // Logo más pequeño (30% del ancho)
 
     return Container(
       width: double.infinity,
       padding: EdgeInsets.only(
         left: 10,
         right: 10,
-        top: 0, // Sin padding superior para que quede pegado arriba
-        bottom: 6,
+        top: 4, // Padding superior mínimo
+        bottom: 4, // Padding inferior reducido
       ),
       decoration: BoxDecoration(
         color: const Color(0xFFE3F2FD), // Celeste suave
         border: Border(
           bottom: BorderSide(
-            color: const Color(0xFF2196F3).withValues(alpha: 0.1),
+            color: const Color(0xFF2196F3).withOpacity(0.1),
             width: 1,
           ),
         ),
@@ -48,23 +48,30 @@ class HomeHeader extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Logo centrado - más arriba
-          Image.asset(
-            'assets/icon/app_icon.png',
+          // Logo centrado - más compacto
+          Container(
             width: logoSize,
             height: logoSize,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.high,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE3F2FD), // Fondo celeste que se fusiona con la app
+            ),
+            child: Image.asset(
+              'assets/icon/app_icon.png',
+              width: logoSize,
+              height: logoSize,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+            ),
           ),
-          const SizedBox(height: 4),
-          // Texto de actualización centrado - más arriba
+          const SizedBox(height: 2), // Espacio reducido
+          // Texto de actualización centrado - más compacto
           Text(
             'Actualizado ${_getTimeAgo(updatedAt)}',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: const Color(0xFF9E9E9E),
-              fontSize: 12,
+              fontSize: 10, // Fuente más pequeña
               fontWeight: FontWeight.w400,
-              letterSpacing: 0.3,
+              letterSpacing: 0.2,
             ),
             textAlign: TextAlign.center,
           ),

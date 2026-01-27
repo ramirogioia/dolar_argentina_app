@@ -23,6 +23,12 @@ class MockDollarDataSource implements DollarDataSource {
         changePercent: -0.2,
       ),
       DollarRate(
+        type: DollarType.crypto,
+        buy: 1470.0,
+        sell: 1480.0,
+        changePercent: 0.4,
+      ),
+      DollarRate(
         type: DollarType.tarjeta,
         buy: 1450.0,
         sell: 1460.0,
@@ -33,12 +39,6 @@ class MockDollarDataSource implements DollarDataSource {
         buy: 1420.0,
         sell: 1430.0,
         changePercent: 0.1,
-      ),
-      DollarRate(
-        type: DollarType.crypto,
-        buy: 1470.0,
-        sell: 1480.0,
-        changePercent: 0.4,
       ),
     ];
 

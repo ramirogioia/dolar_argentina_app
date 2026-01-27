@@ -29,11 +29,11 @@ class AppTheme {
         thickness: 1,
         space: 1,
       ),
-      cardTheme: const CardThemeData(
+      cardTheme: CardTheme(
         color: Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(0)),
+          borderRadius: BorderRadius.circular(0),
         ),
       ),
       textTheme: const TextTheme(

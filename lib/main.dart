@@ -3,12 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/router/app_router.dart';
 import 'app/theme/app_theme.dart';
+import 'features/settings/providers/settings_providers.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Ocultar el splash nativo inmediatamente cuando Flutter esté listo
-  // Esto permite que solo se vea el splash de Flutter (el grande)
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   
   runApp(
@@ -18,14 +17,19 @@ void main() async {
   );
 }
 
-class DolarArgentinaApp extends StatelessWidget {
+class DolarArgentinaApp extends ConsumerWidget {
   const DolarArgentinaApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+    final isDark = themeMode == 'dark';
+
     return MaterialApp.router(
       title: 'Dólar Argentina',
       theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
       routerConfig: appRouter,
       debugShowCheckedModeBanner: false,
     );

@@ -102,18 +102,6 @@ final bankRatesProvider = Provider<Map<Bank, DollarRate>>((ref) {
       sell: 870.8,
       changePercent: -0.16,
     ),
-    Bank.bica: DollarRate(
-      type: DollarType.official,
-      buy: 851.2,
-      sell: 871.2,
-      changePercent: -0.14,
-    ),
-    Bank.mariva: DollarRate(
-      type: DollarType.official,
-      buy: 850.3,
-      sell: 870.3,
-      changePercent: -0.2,
-    ),
     Bank.comafi: DollarRate(
       type: DollarType.official,
       buy: 849.9,

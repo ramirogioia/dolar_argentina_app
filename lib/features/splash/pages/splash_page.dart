@@ -36,7 +36,7 @@ class _SplashPageState extends State<SplashPage> {
       body: SizedBox.expand(
         child: Center(
           child: Image.asset(
-            'assets/icon/app_icon.png',
+            'assets/icon/app_icon3.png',
             width: logoSize,
             height: logoSize,
             fit: BoxFit.contain,

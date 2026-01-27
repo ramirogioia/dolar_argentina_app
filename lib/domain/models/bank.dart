@@ -7,8 +7,6 @@ enum Bank {
   supervielle,
   icbc,
   ciudad,
-  bica,
-  mariva,
   comafi,
   credicoop,
   hipotecario;
@@ -31,10 +29,6 @@ enum Bank {
         return 'Banco ICBC';
       case Bank.ciudad:
         return 'Banco Ciudad';
-      case Bank.bica:
-        return 'Banco Bica';
-      case Bank.mariva:
-        return 'Banco Mariva';
       case Bank.comafi:
         return 'Banco Comafi';
       case Bank.credicoop:
@@ -63,10 +57,6 @@ enum Bank {
         return 'assets/banks/banco_icbc_logo.png';
       case Bank.ciudad:
         return 'assets/banks/banco_ciudad_logo.png';
-      case Bank.bica:
-        return 'assets/banks/banco_bica_logo.png';
-      case Bank.mariva:
-        return 'assets/banks/banco_mariva_logo.png';
       case Bank.comafi:
         return 'assets/banks/banco_comafi_logo.png';
       case Bank.credicoop:

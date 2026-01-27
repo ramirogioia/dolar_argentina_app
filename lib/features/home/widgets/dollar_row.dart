@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../app/utils/currency_formatter.dart';
 import '../../../domain/models/bank.dart';
 import '../../../domain/models/crypto_platform.dart';
@@ -23,12 +24,19 @@ class DollarRow extends ConsumerWidget {
             ? ref.watch(bankRatesProvider)[
                 ref.watch(selectedBankProvider)] ?? rate
             : rate;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE3F2FD), width: 1.5),
+        border: Border.all(
+          color: isDark 
+              ? const Color(0xFF2C2C2C) 
+              : const Color(0xFFD9EDF7), 
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF2196F3).withOpacity(0.08),
@@ -64,7 +72,6 @@ class DollarRow extends ConsumerWidget {
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
                               fontWeight: FontWeight.w700,
-                              color: const Color(0xFF1A1A1A),
                               fontSize: 16,
                               letterSpacing: -0.3,
                             ),
@@ -122,7 +129,6 @@ class DollarRow extends ConsumerWidget {
         Text(
           label.toUpperCase(),
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: const Color(0xFF9E9E9E),
             fontSize: 9,
             fontWeight: FontWeight.w600,
             letterSpacing: 1.2,
@@ -137,7 +143,6 @@ class DollarRow extends ConsumerWidget {
               value,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.w800,
-                color: const Color(0xFF1A1A1A),
                 fontSize: 24,
                 letterSpacing: -0.8,
                 height: 1.1,
@@ -193,19 +198,32 @@ class DollarRow extends ConsumerWidget {
       height: 24,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
+        color: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF2C2C2C)
+            : const Color(0xFFF5F5F5),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
+        border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF3C3C3C)
+              : const Color(0xFFE0E0E0),
+          width: 1,
+        ),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<CryptoPlatform>(
           value: selectedPlatform,
           isDense: true,
-          icon: const Icon(Icons.arrow_drop_down, size: 16, color: Color(0xFF9E9E9E)),
+          icon: Icon(
+            Icons.arrow_drop_down,
+            size: 16,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.grey[400]
+                : const Color(0xFF9E9E9E),
+          ),
           iconSize: 16,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10,
-            color: Color(0xFF1A1A1A),
+            color: Theme.of(context).textTheme.bodyMedium?.color,
             fontWeight: FontWeight.w500,
             letterSpacing: 0.2,
           ),
@@ -271,19 +289,32 @@ class DollarRow extends ConsumerWidget {
       height: 24,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
+        color: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF2C2C2C)
+            : const Color(0xFFF5F5F5),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
+        border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF3C3C3C)
+              : const Color(0xFFE0E0E0),
+          width: 1,
+        ),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<Bank>(
           value: selectedBank,
           isDense: true,
-          icon: const Icon(Icons.arrow_drop_down, size: 16, color: Color(0xFF9E9E9E)),
+          icon: Icon(
+            Icons.arrow_drop_down,
+            size: 16,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.grey[400]
+                : const Color(0xFF9E9E9E),
+          ),
           iconSize: 16,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10,
-            color: Color(0xFF1A1A1A),
+            color: Theme.of(context).textTheme.bodyMedium?.color,
             fontWeight: FontWeight.w500,
             letterSpacing: 0.2,
           ),
@@ -299,16 +330,7 @@ class DollarRow extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Image.asset(
-                    bank.logoPath,
-                    width: 16,
-                    height: 16,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      // Si no existe el logo, mostrar un placeholder
-                      return const SizedBox(width: 16, height: 16);
-                    },
-                  ),
+                  _buildBankLogo(bank.logoPath, 16, 16),
                 ],
               );
             }).toList();
@@ -326,16 +348,7 @@ class DollarRow extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Image.asset(
-                    bank.logoPath,
-                    width: 16,
-                    height: 16,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      // Si no existe el logo, mostrar un placeholder
-                      return const SizedBox(width: 16, height: 16);
-                    },
-                  ),
+                  _buildBankLogo(bank.logoPath, 16, 16),
                 ],
               ),
             );
@@ -348,5 +361,27 @@ class DollarRow extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildBankLogo(String logoPath, double width, double height) {
+    if (logoPath.endsWith('.svg')) {
+      return SvgPicture.asset(
+        logoPath,
+        width: width,
+        height: height,
+        fit: BoxFit.contain,
+        placeholderBuilder: (context) => SizedBox(width: width, height: height),
+      );
+    } else {
+      return Image.asset(
+        logoPath,
+        width: width,
+        height: height,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          return SizedBox(width: width, height: height);
+        },
+      );
+    }
   }
 }

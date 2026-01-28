@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Platform-specific files (generated automatically)
+android/local.properties
+android/.cxx/
+android/.gradle/

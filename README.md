@@ -14,6 +14,8 @@ App simple, rápida y clara para ver cotizaciones del dólar en Argentina.
 
 - Flutter SDK 3.10.7 o superior
 - Dart SDK 3.10.7 o superior
+- Android SDK (para desarrollo Android)
+- Xcode (para desarrollo iOS, solo en Mac)
 
 ## Instalación
 
@@ -32,6 +34,35 @@ flutter pub get
 ```bash
 flutter run
 ```
+
+## Trabajando en Múltiples Plataformas (Mac/Windows)
+
+Si trabajas en Mac y Windows, ten en cuenta:
+
+### Problema del NDK corrupto
+
+Si ves el error `NDK did not have a source.properties file`:
+
+**En Windows (PowerShell):**
+```powershell
+Remove-Item -Path "$env:LOCALAPPDATA\Android\Sdk\ndk\27.0.12077973" -Recurse -Force
+```
+
+**En Mac (Terminal):**
+```bash
+rm -rf ~/Library/Android/sdk/ndk/27.0.12077973
+```
+
+Luego ejecuta `flutter run` de nuevo. Gradle descargará automáticamente el NDK correcto.
+
+### Archivos que NO se sincronizan
+
+Los siguientes archivos son específicos de cada máquina y están en `.gitignore`:
+- `android/local.properties` - Rutas del SDK de Android
+- `android/.gradle/` - Cache de Gradle
+- `android/.cxx/` - Build artifacts de C++
+
+Cada máquina generará estos archivos automáticamente.
 
 ## Configuración del Ícono
 

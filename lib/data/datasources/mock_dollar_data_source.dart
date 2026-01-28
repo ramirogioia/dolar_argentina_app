@@ -40,6 +40,12 @@ class MockDollarDataSource implements DollarDataSource {
         sell: 1430.0,
         changePercent: 0.1,
       ),
+      DollarRate(
+        type: DollarType.ccl,
+        buy: 1410.0,
+        sell: 1420.0,
+        changePercent: 0.05,
+      ),
     ];
 
     return DollarSnapshot(
@@ -48,4 +54,3 @@ class MockDollarDataSource implements DollarDataSource {
     );
   }
 }
-

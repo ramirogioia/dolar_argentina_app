@@ -33,7 +33,8 @@ class HomeHeader extends StatelessWidget {
       padding: EdgeInsets.only(
         left: 10,
         right: 10,
-        top: 2, // Padding superior mínimo
+        top: MediaQuery.of(context).padding.top +
+            8, // Alineado con la tuerca (SafeArea + 8)
         bottom: 8, // Padding inferior para la línea divisoria
       ),
       decoration: BoxDecoration(
@@ -41,6 +42,8 @@ class HomeHeader extends StatelessWidget {
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Logo centrado - más compacto
           Container(
@@ -50,7 +53,7 @@ class HomeHeader extends StatelessWidget {
               color: Theme.of(context).scaffoldBackgroundColor,
             ),
             child: Image.asset(
-              'assets/icon/app_icon3.png',
+              'assets/icon/app_icon_final.png',
               width: logoSize,
               height: logoSize,
               fit: BoxFit.contain,
@@ -58,14 +61,15 @@ class HomeHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 1), // Espacio mínimo entre logo y texto
-          // Texto de actualización centrado - más compacto
+          // Texto de actualización centrado - más grande y en cursiva
           Text(
             'Actualizado ${_getTimeAgo(updatedAt)}',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              fontSize: 9, // Fuente aún más pequeña
-              fontWeight: FontWeight.w400,
-              letterSpacing: 0.2,
-            ),
+                  fontSize: 12, // Más grande
+                  fontWeight: FontWeight.w400,
+                  fontStyle: FontStyle.italic, // Cursiva
+                  letterSpacing: 0.2,
+                ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),

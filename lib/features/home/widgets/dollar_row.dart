@@ -19,22 +19,21 @@ class DollarRow extends ConsumerWidget {
     // Si es official, usar los valores del banco seleccionado
     final displayRate = rate.type == DollarType.crypto
         ? ref.watch(cryptoPlatformRatesProvider)[
-            ref.watch(selectedCryptoPlatformProvider)] ?? rate
+                ref.watch(selectedCryptoPlatformProvider)] ??
+            rate
         : rate.type == DollarType.official
-            ? ref.watch(bankRatesProvider)[
-                ref.watch(selectedBankProvider)] ?? rate
+            ? ref.watch(bankRatesProvider)[ref.watch(selectedBankProvider)] ??
+                rate
             : rate;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark 
-              ? const Color(0xFF2C2C2C) 
-              : const Color(0xFFD9EDF7), 
+          color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFD9EDF7),
           width: 1.5,
         ),
         boxShadow: [
@@ -58,33 +57,36 @@ class DollarRow extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header con nombre y cambio
+            // Header con nombre, dropdown y cambio en la misma línea
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                // Título y dropdown en la misma línea
                 Flexible(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        rate.type.displayName,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                              letterSpacing: -0.3,
-                            ),
-                        overflow: TextOverflow.ellipsis,
+                      Flexible(
+                        child: Text(
+                          rate.type.displayName,
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                    letterSpacing: -0.3,
+                                  ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       // Dropdown de plataforma P2P solo para Dólar Cripto
                       if (rate.type == DollarType.crypto) ...[
-                        const SizedBox(height: 4),
+                        const SizedBox(width: 8),
                         _buildPlatformDropdown(context, ref),
                       ],
                       // Dropdown de banco solo para Dólar Oficial
                       if (rate.type == DollarType.official) ...[
-                        const SizedBox(height: 4),
+                        const SizedBox(width: 8),
                         _buildBankDropdown(context, ref),
                       ],
                     ],
@@ -129,10 +131,10 @@ class DollarRow extends ConsumerWidget {
         Text(
           label.toUpperCase(),
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            fontSize: 9,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1.2,
-          ),
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.2,
+              ),
         ),
         const SizedBox(height: 4),
         Flexible(
@@ -142,11 +144,11 @@ class DollarRow extends ConsumerWidget {
             child: Text(
               value,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w800,
-                fontSize: 24,
-                letterSpacing: -0.8,
-                height: 1.1,
-              ),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 24,
+                    letterSpacing: -0.8,
+                    height: 1.1,
+                  ),
               maxLines: 1,
             ),
           ),
@@ -193,90 +195,98 @@ class DollarRow extends ConsumerWidget {
 
   Widget _buildPlatformDropdown(BuildContext context, WidgetRef ref) {
     final selectedPlatform = ref.watch(selectedCryptoPlatformProvider);
-    
-    return Container(
-      height: 24,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xFF2C2C2C)
-            : const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? const Color(0xFF3C3C3C)
-              : const Color(0xFFE0E0E0),
-          width: 1,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return SizedBox(
+      width: 120, // Ancho fijo para que ambos dropdowns tengan el mismo tamaño
+      child: Container(
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+        decoration: BoxDecoration(
+          color: isDark
+              ? const Color(0xFF1E1E1E).withOpacity(0.6)
+              : Colors.white.withOpacity(0.7),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isDark
+                ? const Color(0xFF3C3C3C).withOpacity(0.5)
+                : const Color(0xFFE3F2FD).withOpacity(0.8),
+            width: 1,
+          ),
         ),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<CryptoPlatform>(
-          value: selectedPlatform,
-          isDense: true,
-          icon: Icon(
-            Icons.arrow_drop_down,
-            size: 16,
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.grey[400]
-                : const Color(0xFF9E9E9E),
-          ),
-          iconSize: 16,
-          style: TextStyle(
-            fontSize: 10,
-            color: Theme.of(context).textTheme.bodyMedium?.color,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 0.2,
-          ),
-          selectedItemBuilder: (BuildContext context) {
-            return CryptoPlatform.values.map((platform) {
-              return Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(
-                      platform.displayName,
-                      overflow: TextOverflow.ellipsis,
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<CryptoPlatform>(
+            value: selectedPlatform,
+            isDense: true,
+            isExpanded: true,
+            icon: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 18,
+              color: isDark
+                  ? Colors.grey[300]
+                  : const Color(0xFF2196F3).withOpacity(0.7),
+            ),
+            iconSize: 18,
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).textTheme.bodyMedium?.color,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.1,
+            ),
+            selectedItemBuilder: (BuildContext context) {
+              return CryptoPlatform.values.map((platform) {
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      platform.logoPath,
+                      width: 14,
+                      height: 14,
+                      fit: BoxFit.contain,
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Image.asset(
-                    platform.logoPath,
-                    width: 16,
-                    height: 16,
-                    fit: BoxFit.contain,
-                  ),
-                ],
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        platform.displayName,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                    ),
+                  ],
+                );
+              }).toList();
+            },
+            items: CryptoPlatform.values.map((platform) {
+              return DropdownMenuItem<CryptoPlatform>(
+                value: platform,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      platform.logoPath,
+                      width: 14,
+                      height: 14,
+                      fit: BoxFit.contain,
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        platform.displayName,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
               );
-            }).toList();
-          },
-          items: CryptoPlatform.values.map((platform) {
-            return DropdownMenuItem<CryptoPlatform>(
-              value: platform,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(
-                      platform.displayName,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Image.asset(
-                    platform.logoPath,
-                    width: 16,
-                    height: 16,
-                    fit: BoxFit.contain,
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
-          onChanged: (CryptoPlatform? newPlatform) {
-            if (newPlatform != null) {
-              ref.read(selectedCryptoPlatformProvider.notifier).state = newPlatform;
-            }
-          },
+            }).toList(),
+            onChanged: (CryptoPlatform? newPlatform) {
+              if (newPlatform != null) {
+                ref.read(selectedCryptoPlatformProvider.notifier).state =
+                    newPlatform;
+              }
+            },
+          ),
         ),
       ),
     );
@@ -284,80 +294,87 @@ class DollarRow extends ConsumerWidget {
 
   Widget _buildBankDropdown(BuildContext context, WidgetRef ref) {
     final selectedBank = ref.watch(selectedBankProvider);
-    
-    return Container(
-      height: 24,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xFF2C2C2C)
-            : const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? const Color(0xFF3C3C3C)
-              : const Color(0xFFE0E0E0),
-          width: 1,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return SizedBox(
+      width: 120, // Ancho fijo para que ambos dropdowns tengan el mismo tamaño
+      child: Container(
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+        decoration: BoxDecoration(
+          color: isDark
+              ? const Color(0xFF1E1E1E).withOpacity(0.6)
+              : Colors.white.withOpacity(0.7),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isDark
+                ? const Color(0xFF3C3C3C).withOpacity(0.5)
+                : const Color(0xFFE3F2FD).withOpacity(0.8),
+            width: 1,
+          ),
         ),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<Bank>(
-          value: selectedBank,
-          isDense: true,
-          icon: Icon(
-            Icons.arrow_drop_down,
-            size: 16,
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.grey[400]
-                : const Color(0xFF9E9E9E),
-          ),
-          iconSize: 16,
-          style: TextStyle(
-            fontSize: 10,
-            color: Theme.of(context).textTheme.bodyMedium?.color,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 0.2,
-          ),
-          selectedItemBuilder: (BuildContext context) {
-            return Bank.values.map((bank) {
-              return Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(
-                      bank.displayName,
-                      overflow: TextOverflow.ellipsis,
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<Bank>(
+            value: selectedBank,
+            isDense: true,
+            isExpanded: true,
+            icon: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 18,
+              color: isDark
+                  ? Colors.grey[300]
+                  : const Color(0xFF2196F3).withOpacity(0.7),
+            ),
+            iconSize: 18,
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).textTheme.bodyMedium?.color,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.1,
+            ),
+            selectedItemBuilder: (BuildContext context) {
+              return Bank.values.map((bank) {
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildBankLogo(bank.logoPath, 14, 14),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        bank.displayName,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  _buildBankLogo(bank.logoPath, 16, 16),
-                ],
+                  ],
+                );
+              }).toList();
+            },
+            items: Bank.values.map((bank) {
+              return DropdownMenuItem<Bank>(
+                value: bank,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildBankLogo(bank.logoPath, 14, 14),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        bank.displayName,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
               );
-            }).toList();
-          },
-          items: Bank.values.map((bank) {
-            return DropdownMenuItem<Bank>(
-              value: bank,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(
-                      bank.displayName,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  _buildBankLogo(bank.logoPath, 16, 16),
-                ],
-              ),
-            );
-          }).toList(),
-          onChanged: (Bank? newBank) {
-            if (newBank != null) {
-              ref.read(selectedBankProvider.notifier).state = newBank;
-            }
-          },
+            }).toList(),
+            onChanged: (Bank? newBank) {
+              if (newBank != null) {
+                ref.read(selectedBankProvider.notifier).state = newBank;
+              }
+            },
+          ),
         ),
       ),
     );

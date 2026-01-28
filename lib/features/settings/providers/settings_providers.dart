@@ -60,7 +60,7 @@ class ApiUrlNotifier extends StateNotifier<String> {
 }
 
 // Provider para la visibilidad de cada tipo de dólar
-final dollarTypeVisibilityProvider = 
+final dollarTypeVisibilityProvider =
     StateNotifierProvider<DollarTypeVisibilityNotifier, Map<DollarType, bool>>(
   (ref) {
     final service = ref.watch(settingsServiceProvider);
@@ -68,12 +68,12 @@ final dollarTypeVisibilityProvider =
   },
 );
 
-class DollarTypeVisibilityNotifier extends StateNotifier<Map<DollarType, bool>> {
+class DollarTypeVisibilityNotifier
+    extends StateNotifier<Map<DollarType, bool>> {
   final SettingsService _service;
   bool _initialized = false;
 
-  DollarTypeVisibilityNotifier(this._service) 
-      : super({}) {
+  DollarTypeVisibilityNotifier(this._service) : super({}) {
     _load();
   }
 
@@ -124,7 +124,7 @@ class ThemeModeNotifier extends StateNotifier<String> {
 }
 
 // Provider para el orden de los tipos de dólar
-final dollarTypeOrderProvider = 
+final dollarTypeOrderProvider =
     StateNotifierProvider<DollarTypeOrderNotifier, List<DollarType>>(
   (ref) {
     final service = ref.watch(settingsServiceProvider);
@@ -143,6 +143,7 @@ class DollarTypeOrderNotifier extends StateNotifier<List<DollarType>> {
     DollarType.crypto,
     DollarType.tarjeta,
     DollarType.mep,
+    DollarType.ccl,
   ];
 
   DollarTypeOrderNotifier(this._service) : super(_defaultOrder) {
@@ -152,11 +153,11 @@ class DollarTypeOrderNotifier extends StateNotifier<List<DollarType>> {
   Future<void> _load() async {
     if (_initialized) return;
     final orderList = await _service.getDollarTypeOrder();
-    
+
     // Convertir la lista de strings a lista de DollarType
     final orderedTypes = <DollarType>[];
     final allTypes = DollarType.values.toList();
-    
+
     // Primero agregar los tipos en el orden guardado
     for (final typeName in orderList) {
       final type = allTypes.firstWhere(
@@ -167,14 +168,14 @@ class DollarTypeOrderNotifier extends StateNotifier<List<DollarType>> {
         orderedTypes.add(type);
       }
     }
-    
+
     // Agregar cualquier tipo que falte (por si se agregaron nuevos tipos)
     for (final type in allTypes) {
       if (!orderedTypes.contains(type)) {
         orderedTypes.add(type);
       }
     }
-    
+
     state = orderedTypes;
     _initialized = true;
   }
@@ -183,16 +184,15 @@ class DollarTypeOrderNotifier extends StateNotifier<List<DollarType>> {
     if (newIndex > oldIndex) {
       newIndex -= 1;
     }
-    
+
     final newOrder = List<DollarType>.from(state);
     final item = newOrder.removeAt(oldIndex);
     newOrder.insert(newIndex, item);
-    
+
     // Guardar el nuevo orden
     final orderList = newOrder.map((type) => type.name).toList();
     await _service.setDollarTypeOrder(orderList);
-    
+
     state = newOrder;
   }
 }
-

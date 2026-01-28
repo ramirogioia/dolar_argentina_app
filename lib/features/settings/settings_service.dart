@@ -10,7 +10,8 @@ class SettingsService {
   static const bool _defaultUseMockData = true;
   static const String _defaultApiUrl =
       'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
-  static const bool _defaultDollarTypeVisible = true; // Por defecto todos visibles
+  static const bool _defaultDollarTypeVisible =
+      true; // Por defecto todos visibles
   static const String _defaultThemeMode = 'light'; // Por defecto light mode
 
   Future<bool> getUseMockData() async {
@@ -35,8 +36,8 @@ class SettingsService {
 
   Future<bool> getDollarTypeVisibility(DollarType type) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('$_keyDollarTypeVisibility${type.name}') ?? 
-           _defaultDollarTypeVisible;
+    return prefs.getBool('$_keyDollarTypeVisibility${type.name}') ??
+        _defaultDollarTypeVisible;
   }
 
   Future<void> setDollarTypeVisibility(DollarType type, bool visible) async {
@@ -47,12 +48,13 @@ class SettingsService {
   Future<Map<DollarType, bool>> getAllDollarTypeVisibility() async {
     final prefs = await SharedPreferences.getInstance();
     final Map<DollarType, bool> visibility = {};
-    
+
     for (final type in DollarType.values) {
-      visibility[type] = prefs.getBool('$_keyDollarTypeVisibility${type.name}') ?? 
-                         _defaultDollarTypeVisible;
+      visibility[type] =
+          prefs.getBool('$_keyDollarTypeVisibility${type.name}') ??
+              _defaultDollarTypeVisible;
     }
-    
+
     return visibility;
   }
 
@@ -69,18 +71,19 @@ class SettingsService {
   Future<List<String>> getDollarTypeOrder() async {
     final prefs = await SharedPreferences.getInstance();
     final orderList = prefs.getStringList(_keyDollarTypeOrder);
-    
+
     if (orderList != null && orderList.isNotEmpty) {
       return orderList;
     }
-    
-    // Por defecto, retornar el orden que coincide con el home: blue, official, crypto, tarjeta, mep
+
+    // Por defecto, retornar el orden que coincide con el home: blue, official, crypto, tarjeta, mep, ccl
     return [
       DollarType.blue.name,
       DollarType.official.name,
       DollarType.crypto.name,
       DollarType.tarjeta.name,
       DollarType.mep.name,
+      DollarType.ccl.name,
     ];
   }
 
@@ -89,4 +92,3 @@ class SettingsService {
     await prefs.setStringList(_keyDollarTypeOrder, order);
   }
 }
-

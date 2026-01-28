@@ -3,6 +3,7 @@ enum DollarType {
   official,
   tarjeta,
   mep,
+  ccl,
   crypto;
 
   String get displayName {
@@ -15,9 +16,10 @@ enum DollarType {
         return 'Dólar Tarjeta';
       case DollarType.mep:
         return 'Dólar MEP';
+      case DollarType.ccl:
+        return 'Dólar CCL';
       case DollarType.crypto:
         return 'Dólar Cripto';
     }
   }
 }
-

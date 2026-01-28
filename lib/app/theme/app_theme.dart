@@ -18,7 +18,8 @@ class AppTheme {
       ),
       scaffoldBackgroundColor: const Color(0xFFD9EDF7), // Celeste verdoso
       appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFFD9EDF7), // Celeste verdoso (mismo que el fondo)
+        backgroundColor:
+            Color(0xFFD9EDF7), // Celeste verdoso (mismo que el fondo)
         foregroundColor: Color(0xFF1A1A1A),
         elevation: 0,
         centerTitle: false,
@@ -29,11 +30,11 @@ class AppTheme {
         thickness: 1,
         space: 1,
       ),
-      cardTheme: CardTheme(
+      cardTheme: const CardThemeData(
         color: Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(0),
+          borderRadius: BorderRadius.all(Radius.circular(0)),
         ),
       ),
       textTheme: const TextTheme(
@@ -87,7 +88,8 @@ class AppTheme {
       ),
       scaffoldBackgroundColor: const Color(0xFF121212), // Negro profundo
       appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF1E1E1E), // Gris muy oscuro
+        backgroundColor:
+            Color(0xFF121212), // Negro profundo (mismo que el fondo)
         foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: false,
@@ -98,11 +100,11 @@ class AppTheme {
         thickness: 1,
         space: 1,
       ),
-      cardTheme: CardTheme(
-        color: const Color(0xFF1E1E1E), // Gris muy oscuro para cards
+      cardTheme: const CardThemeData(
+        color: Color(0xFF1E1E1E), // Gris muy oscuro para cards
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(0),
+          borderRadius: BorderRadius.all(Radius.circular(0)),
         ),
       ),
       textTheme: const TextTheme(

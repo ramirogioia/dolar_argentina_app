@@ -60,6 +60,8 @@ flutter:
   
   assets:
     - assets/icon/app_icon3.png
+    - assets/icon/app_icon_final.png
+    - assets/icon/app_icon_menu_final.png
     - assets/platforms/binance_logo.png
     - assets/platforms/prex_logo.png
     - assets/platforms/dolarapp_logo.png
@@ -68,16 +70,18 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/icon/app_icon3.png"
+  image_path: "assets/icon/app_icon_menu_final.png"
+  adaptive_icon_background: "#D9EDF7"
+  adaptive_icon_foreground: "assets/icon/app_icon_menu_final.png"
   min_sdk_android: 21
 
 flutter_native_splash:
-  color: "#FFFFFF"
-  image: "assets/icon/app_icon3.png"
+  color: "#D9EDF7"
+  image: "assets/icon/app_icon_final.png"
   android: true
   ios: true
   fullscreen: true
   android_12:
-    image: "assets/icon/app_icon3.png"
-    color: "#FFFFFF"
+    image: "assets/icon/app_icon_final.png"
+    color: "#D9EDF7"
     fullscreen: true

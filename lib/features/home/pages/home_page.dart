@@ -6,6 +6,7 @@ import '../../../domain/models/dollar_rate.dart';
 import '../../../domain/models/dollar_snapshot.dart';
 import '../../settings/providers/settings_providers.dart';
 import '../providers/dollar_providers.dart';
+import '../widgets/ad_banner.dart';
 import '../widgets/dollar_row.dart';
 import '../widgets/home_header.dart';
 
@@ -22,8 +23,14 @@ class HomePage extends ConsumerWidget {
           snapshotAsync.when(
             data: (snapshot) => RefreshIndicator(
               onRefresh: () async {
+                // Invalidar ambos providers para forzar la actualización desde GitHub
                 ref.invalidate(dollarSnapshotProvider);
-                await ref.read(dollarSnapshotProvider.future);
+                ref.invalidate(fullJsonDataProvider);
+                // Esperar a que ambos se actualicen
+                await Future.wait([
+                  ref.read(dollarSnapshotProvider.future),
+                  ref.read(fullJsonDataProvider.future),
+                ]);
               },
               color: AppTheme.primaryBlue,
               child: _buildContent(context, ref, snapshot),
@@ -114,13 +121,80 @@ class HomePage extends ConsumerWidget {
                   return DollarRow(rate: rate);
                 }, childCount: visibleRates.length),
               ),
-              // Espacio para el banner fijo + espacio celeste visible
+              // Línea divisoria y texto informativo sobre las fuentes
               SliverToBoxAdapter(
-                child: Container(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 8),
+                    // Línea divisoria (igual que en el header)
+                    Builder(
+                      builder: (context) {
+                        final isDark =
+                            Theme.of(context).brightness == Brightness.dark;
+                        return Container(
+                          height: 1,
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: isDark
+                                  ? [
+                                      Colors.transparent,
+                                      Colors.white.withOpacity(0.1),
+                                      Colors.white.withOpacity(0.15),
+                                      Colors.white.withOpacity(0.1),
+                                      Colors.transparent,
+                                    ]
+                                  : [
+                                      Colors.transparent,
+                                      const Color(0xFF2196F3).withOpacity(0.2),
+                                      const Color(0xFF2196F3).withOpacity(0.4),
+                                      const Color(0xFF2196F3).withOpacity(0.2),
+                                      Colors.transparent,
+                                    ],
+                              stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: isDark
+                                    ? Colors.black.withOpacity(0.3)
+                                    : const Color(0xFF2196F3).withOpacity(0.1),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    // Texto informativo adaptado para una línea
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      child: Text(
+                        'Datos obtenidos directamente de las entidades oficiales.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w400,
+                              fontStyle: FontStyle.italic,
+                              letterSpacing: 0.2,
+                            ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Espacio para el banner fijo
+              // Altura del Large Banner (100px) + espacio celeste arriba (16px) = 116px
+              // El banner tiene su propio margen interno
+              SliverToBoxAdapter(
+                child: SizedBox(
                   height:
-                      148, // 100 (banner) + 32 (margen banner) + 16 (espacio celeste visible)
-                  color: Colors
-                      .transparent, // Transparente para que se vea el fondo celeste
+                      116, // 100 (Large Banner) + 16 (espacio celeste arriba)
                 ),
               ),
             ],
@@ -142,46 +216,12 @@ class HomePage extends ConsumerWidget {
               // Banner de publicidad
               Container(
                 color: Theme.of(context).scaffoldBackgroundColor,
-                child: const _AdPlaceholder(),
+                child: const AdBanner(),
               ),
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-class _AdPlaceholder extends StatelessWidget {
-  const _AdPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      height: 100,
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xFF2C2C2C)
-            : Colors.grey[200],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? const Color(0xFF3C3C3C)
-              : Colors.grey[300]!,
-        ),
-      ),
-      child: Center(
-        child: Text(
-          'Publicidad (AdMob)',
-          style: TextStyle(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.grey[400]
-                : Colors.grey,
-            fontSize: 14,
-          ),
-        ),
-      ),
     );
   }
 }

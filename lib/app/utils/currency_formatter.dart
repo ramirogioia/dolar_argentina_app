@@ -7,7 +7,10 @@ class CurrencyFormatter {
     locale: 'es_AR',
   );
 
-  static String format(double value) {
+  static String format(double? value) {
+    if (value == null) {
+      return '-';
+    }
     return _formatter.format(value);
   }
 }

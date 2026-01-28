@@ -2,14 +2,14 @@ import 'dollar_type.dart';
 
 class DollarRate {
   final DollarType type;
-  final double buy;
-  final double sell;
+  final double? buy;
+  final double? sell;
   final double? changePercent;
 
   const DollarRate({
     required this.type,
-    required this.buy,
-    required this.sell,
+    this.buy,
+    this.sell,
     this.changePercent,
   });
 

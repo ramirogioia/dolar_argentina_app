@@ -10,48 +10,18 @@ class SettingsPage extends ConsumerStatefulWidget {
 }
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
-  late final TextEditingController _apiUrlController;
-  bool _isInitialized = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _apiUrlController = TextEditingController();
-    _loadSettings();
-  }
-
-  Future<void> _loadSettings() async {
-    final apiUrl = ref.read(apiUrlProvider);
-    _apiUrlController.text = apiUrl;
-    setState(() {
-      _isInitialized = true;
-    });
-  }
-
-  @override
-  void dispose() {
-    _apiUrlController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
-    final useMockData = ref.watch(useMockDataProvider);
     final themeMode = ref.watch(themeModeProvider);
     final isDarkMode = themeMode == 'dark';
-
-    if (!_isInitialized) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Ajustes'),
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32), // Padding inferior aumentado
+        padding: const EdgeInsets.fromLTRB(
+            16, 16, 16, 32), // Padding inferior aumentado
         children: [
           Card(
             child: SwitchListTile(
@@ -62,51 +32,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               value: isDarkMode,
               onChanged: (value) {
                 ref.read(themeModeProvider.notifier).setThemeMode(
-                  value ? 'dark' : 'light',
-                );
+                      value ? 'dark' : 'light',
+                    );
               },
-            ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            child: SwitchListTile(
-              title: const Text('Usar datos mock'),
-              subtitle: const Text(
-                'Activa esta opción para usar datos de prueba',
-              ),
-              value: useMockData,
-              onChanged: (value) {
-                ref.read(useMockDataProvider.notifier).setValue(value);
-              },
-            ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'URL Backend',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _apiUrlController,
-                    decoration: const InputDecoration(
-                      hintText: 'Ingresa la URL del backend',
-                      border: OutlineInputBorder(),
-                    ),
-                    enabled: !useMockData,
-                    onChanged: (value) {
-                      if (!useMockData) {
-                        ref.read(apiUrlProvider.notifier).setValue(value);
-                      }
-                    },
-                  ),
-                ],
-              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -131,23 +59,26 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   Builder(
                     builder: (context) {
                       final order = ref.watch(dollarTypeOrderProvider);
-                      final visibility = ref.watch(dollarTypeVisibilityProvider);
-                      
+                      final visibility =
+                          ref.watch(dollarTypeVisibilityProvider);
+
                       return ReorderableListView(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         onReorder: (oldIndex, newIndex) {
-                          ref.read(dollarTypeOrderProvider.notifier)
+                          ref
+                              .read(dollarTypeOrderProvider.notifier)
                               .reorder(oldIndex, newIndex);
                         },
                         children: order.map((type) {
                           final isVisible = visibility[type] ?? true;
-                          
+
                           return ListTile(
                             key: ValueKey(type),
                             leading: Icon(
                               Icons.drag_handle,
-                              color: Theme.of(context).brightness == Brightness.dark
+                              color: Theme.of(context).brightness ==
+                                      Brightness.dark
                                   ? Colors.grey[400]
                                   : Colors.grey[600],
                             ),
@@ -155,7 +86,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             trailing: Switch(
                               value: isVisible,
                               onChanged: (value) {
-                                ref.read(dollarTypeVisibilityProvider.notifier)
+                                ref
+                                    .read(dollarTypeVisibilityProvider.notifier)
                                     .setVisibility(type, value);
                               },
                             ),
@@ -175,17 +107,55 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Información',
-                    style: Theme.of(context).textTheme.titleMedium,
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Información de la App',
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Fuente futura: Google Sheets Web App '
-                    '(Binance P2P + mercados locales)',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey[600],
-                        ),
+                  const SizedBox(height: 16),
+                  _buildInfoSection(
+                    context,
+                    'Funcionalidad',
+                    'Esta app te permite consultar en tiempo real los diferentes tipos de cotización del dólar en Argentina. Los datos se actualizan automáticamente desde fuentes oficiales y plataformas verificadas.',
+                    Icons.currency_exchange,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInfoSection(
+                    context,
+                    'Marcadores de Variación',
+                    'Los indicadores de variación muestran cómo cambió el precio respecto a hace 24 horas:\n\n'
+                        '• Verde ↗️: El precio subió (variación positiva)\n'
+                        '• Rojo ↘️: El precio bajó (variación negativa)\n'
+                        '• Gris ➖: Sin variación significativa (0.00%)',
+                    Icons.trending_up,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInfoSection(
+                    context,
+                    'Opciones Disponibles',
+                    '• Dólar Oficial: Selecciona diferentes bancos para comparar cotizaciones\n'
+                        '• Dólar Cripto: Elige entre plataformas P2P (Binance, KuCoin, OKX, Bitget)\n'
+                        '• Personalización: Reordena y oculta tipos de dólar según tus preferencias\n'
+                        '• Actualización manual: Desliza hacia abajo para refrescar los datos',
+                    Icons.settings_applications,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInfoSection(
+                    context,
+                    'Fuentes de Datos',
+                    'Los datos provienen directamente de las entidades oficiales y se actualizan periódicamente. La información se obtiene desde el repositorio GitHub del backend y refleja las cotizaciones más recientes del mercado.',
+                    Icons.cloud_download,
                   ),
                 ],
               ),
@@ -195,5 +165,43 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ),
     );
   }
-}
 
+  Widget _buildInfoSection(
+    BuildContext context,
+    String title,
+    String content,
+    IconData icon,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.only(left: 28),
+          child: Text(
+            content,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  height: 1.5,
+                ),
+          ),
+        ),
+      ],
+    );
+  }
+}

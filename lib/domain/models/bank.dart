@@ -9,7 +9,8 @@ enum Bank {
   ciudad,
   comafi,
   credicoop,
-  hipotecario;
+  hipotecario,
+  provincia;
 
   String get displayName {
     switch (this) {
@@ -35,6 +36,8 @@ enum Bank {
         return 'Banco Credicoop';
       case Bank.hipotecario:
         return 'Banco Hipotecario';
+      case Bank.provincia:
+        return 'Banco Provincia';
     }
   }
 
@@ -63,6 +66,8 @@ enum Bank {
         return 'assets/banks/banco_credicoop_logo.png';
       case Bank.hipotecario:
         return 'assets/banks/banco_hipotecario_logo.png';
+      case Bank.provincia:
+        return 'assets/banks/banco_provincia_logo.png';
     }
   }
 }

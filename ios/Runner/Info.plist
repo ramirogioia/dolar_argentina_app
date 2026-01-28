@@ -47,7 +47,12 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<true/>
-		<key>UIViewControllerBasedStatusBarAppearance</key>
-		<false/>
-	</dict>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+	<!-- AdMob App ID -->
+	<!-- IMPORTANTE: Usar test ID durante desarrollo, real cuando publiques -->
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-3940256099942544~1458002511</string>
+	<!-- Real ID (descomentar cuando publiques): ca-app-pub-6119092953994163~6222015453 -->
+</dict>
 </plist>

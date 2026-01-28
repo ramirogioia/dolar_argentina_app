@@ -37,6 +37,8 @@ dependencies:
   shared_preferences: ^2.3.2
   intl: ^0.19.0
   flutter_svg: ^2.0.9
+  http: ^1.2.2
+  google_mobile_ads: ^5.1.0
 
 dev_dependencies:
   flutter_test:
@@ -63,8 +65,9 @@ flutter:
     - assets/icon/app_icon_final.png
     - assets/icon/app_icon_menu_final.png
     - assets/platforms/binance_logo.png
-    - assets/platforms/prex_logo.png
-    - assets/platforms/dolarapp_logo.png
+    - assets/platforms/kucoin_logo.png
+    - assets/platforms/okx_logo.png
+    - assets/platforms/bitget_logo.png
     - assets/banks/
 
 flutter_launcher_icons:

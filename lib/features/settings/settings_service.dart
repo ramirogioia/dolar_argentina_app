@@ -9,7 +9,7 @@ class SettingsService {
   static const String _keyDollarTypeOrder = 'dollar_type_order';
   static const bool _defaultUseMockData = true;
   static const String _defaultApiUrl =
-      'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
+      'https://raw.githubusercontent.com/ramirogioia/dolar_argentina_back/main/data';
   static const bool _defaultDollarTypeVisible =
       true; // Por defecto todos visibles
   static const String _defaultThemeMode = 'light'; // Por defecto light mode
@@ -26,7 +26,19 @@ class SettingsService {
 
   Future<String> getApiUrl() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_keyApiUrl) ?? _defaultApiUrl;
+    final savedUrl = prefs.getString(_keyApiUrl);
+    
+    // Si no hay URL guardada o es la URL antigua de Google Apps Script, actualizar y usar la nueva por defecto
+    if (savedUrl == null || 
+        savedUrl.isEmpty || 
+        savedUrl.contains('script.google.com') ||
+        savedUrl.contains('YOUR_SCRIPT_ID')) {
+      // Actualizar automáticamente el valor guardado para futuras ejecuciones
+      await prefs.setString(_keyApiUrl, _defaultApiUrl);
+      return _defaultApiUrl;
+    }
+    
+    return savedUrl;
   }
 
   Future<void> setApiUrl(String value) async {

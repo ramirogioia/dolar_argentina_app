@@ -1,16 +1,19 @@
 enum CryptoPlatform {
   binance,
-  prex,
-  dolarApp;
+  kucoin,
+  okx,
+  bitget;
 
   String get displayName {
     switch (this) {
       case CryptoPlatform.binance:
         return 'Binance P2P';
-      case CryptoPlatform.prex:
-        return 'Prex P2P';
-      case CryptoPlatform.dolarApp:
-        return 'Dolar App P2P';
+      case CryptoPlatform.kucoin:
+        return 'KuCoin P2P';
+      case CryptoPlatform.okx:
+        return 'OKX P2P';
+      case CryptoPlatform.bitget:
+        return 'Bitget P2P';
     }
   }
 
@@ -19,10 +22,12 @@ enum CryptoPlatform {
     switch (this) {
       case CryptoPlatform.binance:
         return 'assets/platforms/binance_logo.png';
-      case CryptoPlatform.prex:
-        return 'assets/platforms/prex_logo.png';
-      case CryptoPlatform.dolarApp:
-        return 'assets/platforms/dolarapp_logo.png';
+      case CryptoPlatform.kucoin:
+        return 'assets/platforms/kucoin_logo.png';
+      case CryptoPlatform.okx:
+        return 'assets/platforms/okx_logo.png';
+      case CryptoPlatform.bitget:
+        return 'assets/platforms/bitget_logo.png';
     }
   }
 }

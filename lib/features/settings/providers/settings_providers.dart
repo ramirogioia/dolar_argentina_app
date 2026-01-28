@@ -49,13 +49,20 @@ class ApiUrlNotifier extends StateNotifier<String> {
 
   Future<void> _load() async {
     if (_initialized) return;
-    state = await _service.getApiUrl();
+    final url = await _service.getApiUrl();
+    state = url;
     _initialized = true;
   }
 
   Future<void> setValue(String value) async {
     await _service.setApiUrl(value);
     state = value;
+  }
+  
+  // Método para forzar recarga (útil después de cambios en el servicio)
+  Future<void> reload() async {
+    _initialized = false;
+    await _load();
   }
 }
 

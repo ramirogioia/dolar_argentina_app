@@ -1,24 +1,62 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
-class HomeHeader extends StatelessWidget {
+class HomeHeader extends StatefulWidget {
   final DateTime updatedAt;
 
   const HomeHeader({super.key, required this.updatedAt});
 
-  String _getTimeAgo(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
+  @override
+  State<HomeHeader> createState() => _HomeHeaderState();
+}
 
-    if (difference.inMinutes < 1) {
-      return 'hace menos de 1 min';
+class _HomeHeaderState extends State<HomeHeader> {
+  Timer? _timer;
+  String _timeAgoText = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _updateTimeAgo();
+    // Actualizar cada minuto
+    _timer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) {
+        setState(() {
+          _updateTimeAgo();
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _updateTimeAgo() {
+    final now = DateTime.now();
+    final difference = now.difference(widget.updatedAt);
+
+    if (difference.inSeconds < 60) {
+      _timeAgoText = 'hace un momento';
     } else if (difference.inMinutes == 1) {
-      return 'hace 1 min';
+      _timeAgoText = 'hace 1 min';
     } else if (difference.inMinutes < 60) {
-      return 'hace ${difference.inMinutes} min';
+      _timeAgoText = 'hace ${difference.inMinutes} min';
     } else if (difference.inHours == 1) {
-      return 'hace 1 hora';
+      _timeAgoText = 'hace 1 hora';
     } else {
-      return 'hace ${difference.inHours} horas';
+      _timeAgoText = 'hace ${difference.inHours} horas';
+    }
+  }
+
+  @override
+  void didUpdateWidget(HomeHeader oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Si cambió la fecha de actualización, actualizar el texto inmediatamente
+    if (oldWidget.updatedAt != widget.updatedAt) {
+      _updateTimeAgo();
     }
   }
 
@@ -63,7 +101,7 @@ class HomeHeader extends StatelessWidget {
           const SizedBox(height: 1), // Espacio mínimo entre logo y texto
           // Texto de actualización centrado - más grande y en cursiva
           Text(
-            'Actualizado ${_getTimeAgo(updatedAt)}',
+            'Actualizado $_timeAgoText',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   fontSize: 12, // Más grande
                   fontWeight: FontWeight.w400,

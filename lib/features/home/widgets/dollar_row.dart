@@ -17,14 +17,44 @@ class DollarRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Si es crypto, usar los valores de la plataforma seleccionada
     // Si es official, usar los valores del banco seleccionado
-    final displayRate = rate.type == DollarType.crypto
-        ? ref.watch(cryptoPlatformRatesProvider)[
-                ref.watch(selectedCryptoPlatformProvider)] ??
-            rate
-        : rate.type == DollarType.official
-            ? ref.watch(bankRatesProvider)[ref.watch(selectedBankProvider)] ??
-                rate
-            : rate;
+    DollarRate displayRate;
+    if (rate.type == DollarType.crypto) {
+      final platformRates = ref.watch(cryptoPlatformRatesProvider);
+      final selectedPlatform = ref.watch(selectedCryptoPlatformProvider);
+      displayRate = platformRates[selectedPlatform] ?? rate;
+      // Si el rate del provider no tiene changePercent pero el rate original sí,
+      // y son de la misma plataforma, mantener el changePercent del original
+      if (displayRate.changePercent == null && rate.changePercent != null) {
+        displayRate = DollarRate(
+          type: displayRate.type,
+          buy: displayRate.buy,
+          sell: displayRate.sell,
+          changePercent:
+              displayRate.buy == rate.buy && displayRate.sell == rate.sell
+                  ? rate.changePercent
+                  : null,
+        );
+      }
+    } else if (rate.type == DollarType.official) {
+      final bankRates = ref.watch(bankRatesProvider);
+      final selectedBank = ref.watch(selectedBankProvider);
+      displayRate = bankRates[selectedBank] ?? rate;
+      // Si el rate del provider no tiene changePercent pero el rate original sí,
+      // y son del mismo banco, mantener el changePercent del original
+      if (displayRate.changePercent == null && rate.changePercent != null) {
+        displayRate = DollarRate(
+          type: displayRate.type,
+          buy: displayRate.buy,
+          sell: displayRate.sell,
+          changePercent:
+              displayRate.buy == rate.buy && displayRate.sell == rate.sell
+                  ? rate.changePercent
+                  : null,
+        );
+      }
+    } else {
+      displayRate = rate;
+    }
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
@@ -98,16 +128,27 @@ class DollarRow extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             // Compra y Venta
+            // Para Dólar Tarjeta sin Compra, mantener Venta en su posición original (derecha)
             Row(
               children: [
-                Expanded(
-                  child: _buildPriceSection(
-                    context,
-                    'Compra',
-                    CurrencyFormatter.format(displayRate.buy),
-                  ),
-                ),
-                const SizedBox(width: 16),
+                // Mostrar Compra si no es Tarjeta o si tiene valor
+                if (displayRate.type != DollarType.tarjeta ||
+                    displayRate.buy != null)
+                  Expanded(
+                    child: _buildPriceSection(
+                      context,
+                      'Compra',
+                      CurrencyFormatter.format(displayRate.buy),
+                    ),
+                  )
+                else
+                  // Si es Tarjeta sin Compra, espacio vacío para mantener posición de Venta
+                  const Expanded(child: SizedBox()),
+                // Solo agregar espacio si se muestra Compra
+                if (displayRate.type != DollarType.tarjeta ||
+                    displayRate.buy != null)
+                  const SizedBox(width: 16),
+                // Venta siempre se muestra en su posición original (derecha)
                 Expanded(
                   child: _buildPriceSection(
                     context,
@@ -158,10 +199,23 @@ class DollarRow extends ConsumerWidget {
   }
 
   Widget _buildChangeIndicator(double changePercent) {
-    final isPositive = changePercent >= 0;
-    final color = isPositive
-        ? const Color(0xFF4CAF50) // Verde suave
-        : const Color(0xFFF44336); // Rojo suave
+    // Determinar el tipo de variación (umbral de 0.01% para considerar "sin variación")
+    final absChange = changePercent.abs();
+    final isNeutral = absChange < 0.01;
+    final isPositive = changePercent > 0.01;
+
+    final color = isNeutral
+        ? Colors.grey // Gris para sin variación
+        : isPositive
+            ? const Color(0xFF4CAF50) // Verde suave para positivo
+            : const Color(0xFFF44336); // Rojo suave para negativo
+
+    IconData icon;
+    if (isNeutral) {
+      icon = Icons.remove; // Línea horizontal para sin variación
+    } else {
+      icon = isPositive ? Icons.trending_up : Icons.trending_down;
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -174,13 +228,15 @@ class DollarRow extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            isPositive ? Icons.trending_up : Icons.trending_down,
+            icon,
             size: 14,
             color: color,
           ),
           const SizedBox(width: 4),
           Text(
-            '${isPositive ? '+' : ''}${changePercent.toStringAsFixed(2)}%',
+            isNeutral
+                ? '0.00%'
+                : '${isPositive ? '+' : ''}${changePercent.toStringAsFixed(2)}%',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
@@ -238,12 +294,7 @@ class DollarRow extends ConsumerWidget {
                 return Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Image.asset(
-                      platform.logoPath,
-                      width: 14,
-                      height: 14,
-                      fit: BoxFit.contain,
-                    ),
+                    _buildPlatformLogo(platform.logoPath, 14, 14),
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
@@ -262,12 +313,7 @@ class DollarRow extends ConsumerWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Image.asset(
-                      platform.logoPath,
-                      width: 14,
-                      height: 14,
-                      fit: BoxFit.contain,
-                    ),
+                    _buildPlatformLogo(platform.logoPath, 14, 14),
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
@@ -381,6 +427,28 @@ class DollarRow extends ConsumerWidget {
   }
 
   Widget _buildBankLogo(String logoPath, double width, double height) {
+    if (logoPath.endsWith('.svg')) {
+      return SvgPicture.asset(
+        logoPath,
+        width: width,
+        height: height,
+        fit: BoxFit.contain,
+        placeholderBuilder: (context) => SizedBox(width: width, height: height),
+      );
+    } else {
+      return Image.asset(
+        logoPath,
+        width: width,
+        height: height,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          return SizedBox(width: width, height: height);
+        },
+      );
+    }
+  }
+
+  Widget _buildPlatformLogo(String logoPath, double width, double height) {
     if (logoPath.endsWith('.svg')) {
       return SvgPicture.asset(
         logoPath,

@@ -7,12 +7,14 @@ class SettingsService {
   static const String _keyDollarTypeVisibility = 'dollar_type_visibility_';
   static const String _keyThemeMode = 'theme_mode'; // 'light' o 'dark'
   static const String _keyDollarTypeOrder = 'dollar_type_order';
+  static const String _keyNotificationsEnabled = 'notifications_enabled';
   static const bool _defaultUseMockData = true;
   static const String _defaultApiUrl =
       'https://raw.githubusercontent.com/ramirogioia/dolar_argentina_back/main/data';
   static const bool _defaultDollarTypeVisible =
       true; // Por defecto todos visibles
   static const String _defaultThemeMode = 'light'; // Por defecto light mode
+  static const bool _defaultNotificationsEnabled = true; // Por defecto activadas
 
   Future<bool> getUseMockData() async {
     final prefs = await SharedPreferences.getInstance();
@@ -102,5 +104,15 @@ class SettingsService {
   Future<void> setDollarTypeOrder(List<String> order) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_keyDollarTypeOrder, order);
+  }
+
+  Future<bool> getNotificationsEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyNotificationsEnabled) ?? _defaultNotificationsEnabled;
+  }
+
+  Future<void> setNotificationsEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyNotificationsEnabled, enabled);
   }
 }

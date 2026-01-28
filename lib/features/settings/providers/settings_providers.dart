@@ -203,3 +203,32 @@ class DollarTypeOrderNotifier extends StateNotifier<List<DollarType>> {
     state = newOrder;
   }
 }
+
+// Provider para notificaciones push
+final notificationsEnabledProvider =
+    StateNotifierProvider<NotificationsEnabledNotifier, bool>(
+  (ref) {
+    final service = ref.watch(settingsServiceProvider);
+    return NotificationsEnabledNotifier(service);
+  },
+);
+
+class NotificationsEnabledNotifier extends StateNotifier<bool> {
+  final SettingsService _service;
+  bool _initialized = false;
+
+  NotificationsEnabledNotifier(this._service) : super(true) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (_initialized) return;
+    state = await _service.getNotificationsEnabled();
+    _initialized = true;
+  }
+
+  Future<void> setEnabled(bool enabled) async {
+    await _service.setNotificationsEnabled(enabled);
+    state = enabled;
+  }
+}

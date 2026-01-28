@@ -49,6 +49,11 @@
 		<true/>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+	<!-- Background Modes para notificaciones push -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<!-- AdMob App ID -->
 	<!-- IMPORTANTE: Usar test ID durante desarrollo, real cuando publiques -->
 	<key>GADApplicationIdentifier</key>

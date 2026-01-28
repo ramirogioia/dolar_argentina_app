@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1027895605266",
+    "project_id": "dolar-argentina-c7939",
+    "storage_bucket": "dolar-argentina-c7939.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1027895605266:android:637b91c33ede8bcd3300cb",
+        "android_client_info": {
+          "package_name": "com.rgioia.dolarargentina"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAzmX5J7H4Uuss584NGGYPkfAeiINJUDrc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

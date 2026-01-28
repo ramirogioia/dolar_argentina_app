@@ -1,5 +1,6 @@
-package com.dolarargentina.dolar_argentina_app
+package com.rgioia.dolarargentina
 
 import io.flutter.embedding.android.FlutterActivity
 
 class MainActivity : FlutterActivity()
+

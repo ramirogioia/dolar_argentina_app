@@ -101,10 +101,9 @@ La app está preparada para conectarse a un Google Apps Script Web App que obten
    - Publica como Web App
    - Obtén la URL del script
 
-2. **Configurar en la app**:
+2. **Configurar en la app** (si usas otro backend):
    - Ve a Ajustes
-   - Desactiva "Usar datos mock"
-   - Ingresa la URL del backend en "URL Backend"
+   - Ingresa la URL del backend en "URL Backend" (por defecto usa el repo GitHub del backend)
 
 3. **Formato esperado del backend**:
 ```json

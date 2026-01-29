@@ -8,16 +8,13 @@ import '../../../domain/models/dollar_snapshot.dart';
 import '../../../domain/models/dollar_type.dart';
 import '../../settings/providers/settings_providers.dart';
 
+final _defaultBackendUrl =
+    'https://raw.githubusercontent.com/ramirogioia/dolar_argentina_back/main/data';
+
 final dollarRepositoryProvider = Provider<DollarRepository>((ref) {
-  final useMockData = ref.watch(useMockDataProvider);
   final apiUrl = ref.watch(apiUrlProvider);
-  
-  // Debug: imprimir la URL que se está usando
-  if (!useMockData) {
-    print('🔧 Usando URL del backend: $apiUrl');
-  }
-  
-  return DollarRepository(useMockData: useMockData, apiUrl: apiUrl);
+  final url = apiUrl.isNotEmpty ? apiUrl : _defaultBackendUrl;
+  return DollarRepository(apiUrl: url);
 });
 
 final dollarSnapshotProvider =
@@ -26,16 +23,11 @@ final dollarSnapshotProvider =
   return repository.getDollarRates();
 });
 
-// Provider para obtener el JSON completo cuando no se usa mock
+// Provider para obtener el JSON completo del backend
 final fullJsonDataProvider = FutureProvider<Map<String, dynamic>>((ref) async {
-  final useMockData = ref.watch(useMockDataProvider);
   final apiUrl = ref.watch(apiUrlProvider);
-  
-  if (useMockData) {
-    return {};
-  }
-  
-  final dataSource = HttpDollarDataSource(baseUrl: apiUrl);
+  final url = apiUrl.isNotEmpty ? apiUrl : _defaultBackendUrl;
+  final dataSource = HttpDollarDataSource(baseUrl: url);
   return await dataSource.getFullJsonData();
 });
 
@@ -43,46 +35,24 @@ final fullJsonDataProvider = FutureProvider<Map<String, dynamic>>((ref) async {
 final selectedCryptoPlatformProvider =
     StateProvider<CryptoPlatform>((ref) => CryptoPlatform.binance);
 
-// Valores para cada plataforma P2P (desde JSON o mock)
+// Tasas vacías cuando no hay datos del backend (muestra "-" en la UI)
+Map<CryptoPlatform, DollarRate> get _emptyCryptoRates => {
+  for (final p in CryptoPlatform.values)
+    p: DollarRate(type: DollarType.crypto, buy: null, sell: null, changePercent: null),
+};
+
+// Valores para cada plataforma P2P (desde backend)
 final cryptoPlatformRatesProvider = Provider<Map<CryptoPlatform, DollarRate>>((ref) {
   final jsonDataAsync = ref.watch(fullJsonDataProvider);
-  
-  // Datos mock por defecto
-  final mockRates = {
-    CryptoPlatform.binance: DollarRate(
-      type: DollarType.crypto,
-      buy: 1470.0,
-      sell: 1480.0,
-      changePercent: 0.4,
-    ),
-    CryptoPlatform.kucoin: DollarRate(
-      type: DollarType.crypto,
-      buy: 1475.0,
-      sell: 1485.0,
-      changePercent: 0.38,
-    ),
-    CryptoPlatform.okx: DollarRate(
-      type: DollarType.crypto,
-      buy: 1473.0,
-      sell: 1483.0,
-      changePercent: 0.36,
-    ),
-    CryptoPlatform.bitget: DollarRate(
-      type: DollarType.crypto,
-      buy: 1474.0,
-      sell: 1484.0,
-      changePercent: 0.37,
-    ),
-  };
 
   return jsonDataAsync.when(
     data: (jsonData) {
-      if (jsonData.isEmpty) return mockRates;
+      if (jsonData.isEmpty) return _emptyCryptoRates;
       
       final ultimaCorrida = jsonData['ultima_corrida'] as Map<String, dynamic>?;
       final dolarCripto = ultimaCorrida?['dolar_cripto'] as Map<String, dynamic>?;
       
-      if (dolarCripto == null) return mockRates;
+      if (dolarCripto == null) return _emptyCryptoRates;
       
       // Obtener penúltima corrida para calcular variaciones
       final corridas = jsonData['corridas'] as List<dynamic>?;
@@ -97,7 +67,7 @@ final cryptoPlatformRatesProvider = Provider<Map<CryptoPlatform, DollarRate>>((r
         penultimaCorrida = sortedCorridas[1];
       }
       
-      final rates = Map<CryptoPlatform, DollarRate>.from(mockRates);
+      final rates = Map<CryptoPlatform, DollarRate>.from(_emptyCryptoRates);
       
       // Mapear plataformas del JSON a enums
       final platformMapping = {
@@ -142,103 +112,33 @@ final cryptoPlatformRatesProvider = Provider<Map<CryptoPlatform, DollarRate>>((r
       
       return rates;
     },
-    loading: () => mockRates,
-    error: (_, __) => mockRates,
+    loading: () => _emptyCryptoRates,
+    error: (_, __) => _emptyCryptoRates,
   );
 });
+
+// Tasas vacías para bancos cuando no hay datos del backend
+Map<Bank, DollarRate> get _emptyBankRates => {
+  for (final b in Bank.values)
+    b: DollarRate(type: DollarType.official, buy: null, sell: null, changePercent: null),
+};
 
 // Provider para el banco seleccionado (por defecto Banco Nación)
 final selectedBankProvider =
     StateProvider<Bank>((ref) => Bank.nacion);
 
-// Valores para cada banco (desde JSON o mock)
+// Valores para cada banco (desde backend)
 final bankRatesProvider = Provider<Map<Bank, DollarRate>>((ref) {
   final jsonDataAsync = ref.watch(fullJsonDataProvider);
-  
-  // Datos mock por defecto
-  final mockRates = {
-    Bank.nacion: DollarRate(
-      type: DollarType.official,
-      buy: 850.0,
-      sell: 870.0,
-      changePercent: -0.2,
-    ),
-    Bank.santander: DollarRate(
-      type: DollarType.official,
-      buy: 851.0,
-      sell: 871.0,
-      changePercent: -0.15,
-    ),
-    Bank.galicia: DollarRate(
-      type: DollarType.official,
-      buy: 849.5,
-      sell: 869.5,
-      changePercent: -0.25,
-    ),
-    Bank.bbva: DollarRate(
-      type: DollarType.official,
-      buy: 850.5,
-      sell: 870.5,
-      changePercent: -0.18,
-    ),
-    Bank.patagonia: DollarRate(
-      type: DollarType.official,
-      buy: 851.5,
-      sell: 871.5,
-      changePercent: -0.12,
-    ),
-    Bank.supervielle: DollarRate(
-      type: DollarType.official,
-      buy: 850.2,
-      sell: 870.2,
-      changePercent: -0.22,
-    ),
-    Bank.icbc: DollarRate(
-      type: DollarType.official,
-      buy: 849.8,
-      sell: 869.8,
-      changePercent: -0.28,
-    ),
-    Bank.ciudad: DollarRate(
-      type: DollarType.official,
-      buy: 850.8,
-      sell: 870.8,
-      changePercent: -0.16,
-    ),
-    Bank.comafi: DollarRate(
-      type: DollarType.official,
-      buy: 849.9,
-      sell: 869.9,
-      changePercent: -0.26,
-    ),
-    Bank.credicoop: DollarRate(
-      type: DollarType.official,
-      buy: 850.6,
-      sell: 870.6,
-      changePercent: -0.17,
-    ),
-    Bank.hipotecario: DollarRate(
-      type: DollarType.official,
-      buy: 851.1,
-      sell: 871.1,
-      changePercent: -0.13,
-    ),
-    Bank.provincia: DollarRate(
-      type: DollarType.official,
-      buy: 850.5,
-      sell: 870.5,
-      changePercent: -0.19,
-    ),
-  };
 
   return jsonDataAsync.when(
     data: (jsonData) {
-      if (jsonData.isEmpty) return mockRates;
+      if (jsonData.isEmpty) return _emptyBankRates;
       
       final ultimaCorrida = jsonData['ultima_corrida'] as Map<String, dynamic>?;
       final dolarOficial = ultimaCorrida?['dolar_oficial'] as Map<String, dynamic>?;
       
-      if (dolarOficial == null) return mockRates;
+      if (dolarOficial == null) return _emptyBankRates;
       
       // Obtener penúltima corrida para calcular variaciones
       final corridas = jsonData['corridas'] as List<dynamic>?;
@@ -253,7 +153,7 @@ final bankRatesProvider = Provider<Map<Bank, DollarRate>>((ref) {
         penultimaCorrida = sortedCorridas[1];
       }
       
-      final rates = Map<Bank, DollarRate>.from(mockRates);
+      final rates = Map<Bank, DollarRate>.from(_emptyBankRates);
       
       // Mapear bancos del JSON a enums
       // Mapeo de nombres del JSON a enums de la app
@@ -303,8 +203,8 @@ final bankRatesProvider = Provider<Map<Bank, DollarRate>>((ref) {
       
       return rates;
     },
-    loading: () => mockRates,
-    error: (_, __) => mockRates,
+    loading: () => _emptyBankRates,
+    error: (_, __) => _emptyBankRates,
   );
 });
 

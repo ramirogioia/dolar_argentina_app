@@ -2,29 +2,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/models/dollar_type.dart';
 
 class SettingsService {
-  static const String _keyUseMockData = 'use_mock_data';
   static const String _keyApiUrl = 'api_url';
   static const String _keyDollarTypeVisibility = 'dollar_type_visibility_';
   static const String _keyThemeMode = 'theme_mode'; // 'light' o 'dark'
   static const String _keyDollarTypeOrder = 'dollar_type_order';
   static const String _keyNotificationsEnabled = 'notifications_enabled';
-  static const bool _defaultUseMockData = true;
   static const String _defaultApiUrl =
       'https://raw.githubusercontent.com/ramirogioia/dolar_argentina_back/main/data';
   static const bool _defaultDollarTypeVisible =
       true; // Por defecto todos visibles
   static const String _defaultThemeMode = 'light'; // Por defecto light mode
   static const bool _defaultNotificationsEnabled = true; // Por defecto activadas
-
-  Future<bool> getUseMockData() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_keyUseMockData) ?? _defaultUseMockData;
-  }
-
-  Future<void> setUseMockData(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyUseMockData, value);
-  }
 
   Future<String> getApiUrl() async {
     final prefs = await SharedPreferences.getInstance();

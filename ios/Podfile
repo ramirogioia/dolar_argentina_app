@@ -38,7 +38,14 @@ target 'Runner' do
 end
 
 post_install do |installer|
+  # A nivel de proyecto Pods (afecta a todos los pods)
+  installer.pods_project.build_configurations.each do |config|
+    config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+  end
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+    target.build_configurations.each do |config|
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+    end
   end
 end

@@ -38,32 +38,7 @@ class HomePage extends ConsumerWidget {
             loading: () => Center(
               child: CircularProgressIndicator(color: AppTheme.primaryBlue),
             ),
-            error: (error, stack) => Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Error al cargar datos',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    error.toString(),
-                    style: Theme.of(context).textTheme.bodySmall,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      ref.invalidate(dollarSnapshotProvider);
-                    },
-                    child: const Text('Reintentar'),
-                  ),
-                ],
-              ),
-            ),
+            error: (error, stack) => _buildErrorState(context, ref, error),
           ),
           // Botón de configuración flotante en la esquina superior derecha
           Positioned(
@@ -80,6 +55,81 @@ class HomePage extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  static bool _isNetworkError(Object error) {
+    final msg = error.toString().toLowerCase();
+    return msg.contains('timeout') ||
+        msg.contains('socket') ||
+        msg.contains('connection') ||
+        msg.contains('failed host lookup') ||
+        msg.contains('network is unreachable') ||
+        msg.contains('service_not_available') ||
+        msg.contains('no internet') ||
+        msg.contains('connection refused');
+  }
+
+  static Widget _buildErrorState(
+      BuildContext context, WidgetRef ref, Object error) {
+    final isNetwork = _isNetworkError(error);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isNetwork ? Icons.wifi_off_rounded : Icons.error_outline,
+              size: 64,
+              color: isNetwork
+                  ? Theme.of(context).colorScheme.primary
+                  : Colors.red,
+            ),
+            const SizedBox(height: 20),
+            Text(
+              isNetwork ? 'Sin conexión' : 'Error al cargar datos',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              isNetwork
+                  ? 'Revisá que tengas WiFi o datos móviles activos y tocá Reintentar.'
+                  : 'No se pudieron cargar las cotizaciones.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).textTheme.bodySmall?.color,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            if (!isNetwork) ...[
+              const SizedBox(height: 8),
+              Text(
+                error.toString(),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontSize: 11,
+                      color: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.color
+                          ?.withOpacity(0.8),
+                    ),
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: () => ref.invalidate(dollarSnapshotProvider),
+              icon: const Icon(Icons.refresh_rounded, size: 20),
+              label: const Text('Reintentar'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -112,7 +162,10 @@ class HomePage extends ConsumerWidget {
             slivers: [
               // Header
               SliverToBoxAdapter(
-                child: HomeHeader(updatedAt: snapshot.updatedAt),
+                child: HomeHeader(
+                  updatedAt: snapshot.updatedAt,
+                  lastMeasurementAt: snapshot.lastMeasurementAt,
+                ),
               ),
               // Lista de cards con scroll (solo los visibles)
               SliverList(
@@ -170,8 +223,8 @@ class HomePage extends ConsumerWidget {
                     const SizedBox(height: 8),
                     // Texto informativo adaptado para una línea
                     Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.only(
+                          left: 16, right: 16, top: 8, bottom: 12),
                       child: Text(
                         'Datos obtenidos directamente de las entidades oficiales.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -188,13 +241,10 @@ class HomePage extends ConsumerWidget {
                   ],
                 ),
               ),
-              // Espacio para el banner fijo
-              // Altura del Large Banner (100px) + espacio celeste arriba (16px) = 116px
-              // El banner tiene su propio margen interno
+              // Espacio para el banner fijo: altura banner + gap mínimo para que la leyenda no quede tapada
               SliverToBoxAdapter(
                 child: SizedBox(
-                  height:
-                      116, // 100 (Large Banner) + 16 (espacio celeste arriba)
+                  height: 115,
                 ),
               ),
             ],

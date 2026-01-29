@@ -87,43 +87,36 @@ class DollarRow extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header con nombre, dropdown y cambio en la misma línea
+            // Header: título | dropdown (centrado) | variación
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Título y dropdown en la misma línea
-                Flexible(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          rate.type.displayName,
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 16,
-                                    letterSpacing: -0.3,
-                                  ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      // Dropdown de plataforma P2P solo para Dólar Cripto
-                      if (rate.type == DollarType.crypto) ...[
-                        const SizedBox(width: 8),
-                        _buildPlatformDropdown(context, ref),
-                      ],
-                      // Dropdown de banco solo para Dólar Oficial
-                      if (rate.type == DollarType.official) ...[
-                        const SizedBox(width: 8),
-                        _buildBankDropdown(context, ref),
-                      ],
-                    ],
-                  ),
+                Text(
+                  rate.type.displayName,
+                  style:
+                      Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                            letterSpacing: -0.3,
+                          ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                if (displayRate.changePercent != null)
+                const SizedBox(width: 8),
+                // Espacio central: dropdown centrado entre título y variación
+                if (rate.type == DollarType.crypto)
+                  Expanded(
+                    child: Center(child: _buildPlatformDropdown(context, ref)),
+                  )
+                else if (rate.type == DollarType.official)
+                  Expanded(
+                    child: Center(child: _buildBankDropdown(context, ref)),
+                  )
+                else
+                  const Spacer(),
+                if (displayRate.changePercent != null) ...[
+                  const SizedBox(width: 8),
                   _buildChangeIndicator(displayRate.changePercent!),
+                ],
               ],
             ),
             const SizedBox(height: 16),
@@ -254,7 +247,7 @@ class DollarRow extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SizedBox(
-      width: 120, // Ancho fijo para que ambos dropdowns tengan el mismo tamaño
+      width: 150, // Ancho para mostrar "Binance P2P" / nombres completos en iOS
       child: Container(
         height: 28,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
@@ -343,7 +336,7 @@ class DollarRow extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SizedBox(
-      width: 120, // Ancho fijo para que ambos dropdowns tengan el mismo tamaño
+      width: 150, // Ancho para mostrar "Banco Nación" / nombres completos en iOS
       child: Container(
         height: 28,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),

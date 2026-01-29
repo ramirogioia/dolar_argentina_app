@@ -74,6 +74,11 @@ class FCMService {
               print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
               print(token);
               print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+              if (Platform.isIOS) {
+                print('🍎 iOS: Si no recibís notificaciones en el iPhone, subí la clave APNs (.p8) en Firebase:');
+                print('   Firebase Console → Configuración → Cloud Messaging → Configuración de apps de Apple.');
+                print('   Ver ios/IOS_PUSH_SETUP.md');
+              }
               break; // Éxito, salir del loop
             } else {
               print('⚠️ Token FCM es null o vacío');
@@ -163,9 +168,9 @@ class FCMService {
 
   /// Inicializa las notificaciones locales (necesario para mostrar notificaciones en foreground en Android)
   static Future<void> _initializeLocalNotifications() async {
-    // Configuración para Android
+    // Configuración para Android (icono blanco/transparente para la barra de notificaciones)
     const AndroidInitializationSettings androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('ic_notification');
 
     // Configuración para iOS
     const DarwinInitializationSettings iosSettings =
@@ -241,12 +246,13 @@ class FCMService {
     final notification = message.notification;
     if (notification == null) return;
 
-    // Mostrar notificación local
+    // Mostrar notificación local (icono circular blanco para la barra)
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
       'dolar_argentina_channel',
       'Dólar Argentina Notificaciones',
       channelDescription: 'Notificaciones sobre cotizaciones del dólar',
+      icon: 'ic_notification',
       importance: Importance.high,
       priority: Priority.high,
       showWhen: true,
@@ -456,6 +462,7 @@ class FCMService {
         'dolar_argentina_channel',
         'Dólar Argentina Notificaciones',
         channelDescription: 'Notificaciones sobre cotizaciones del dólar',
+        icon: 'ic_notification',
         importance: Importance.high,
         priority: Priority.high,
         showWhen: true,
@@ -562,6 +569,13 @@ class FCMService {
       print('5️⃣ Firebase App: ✅ Configurado (${app.name})');
     } catch (e) {
       print('5️⃣ Firebase App: ❌ No configurado: $e');
+    }
+
+    // 6. Recordatorio iOS: APNs en Firebase (si no llegan notificaciones)
+    if (Platform.isIOS) {
+      print('6️⃣ iOS: Si no recibís notificaciones, subí la clave APNs (.p8) en Firebase:');
+      print('   Firebase Console → Configuración → Cloud Messaging → Configuración de apps de Apple.');
+      print('   Ver ios/IOS_PUSH_SETUP.md o docs/IOS_PUSH_CHECKLIST.md');
     }
 
     print('🔍 ===== FIN DIAGNÓSTICO =====\n');

@@ -1,9 +1,10 @@
+import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 /// Widget para mostrar un banner de AdMob
-/// Usa IDs de prueba durante desarrollo
 class AdBanner extends StatefulWidget {
   const AdBanner({super.key});
 
@@ -15,6 +16,7 @@ class _AdBannerState extends State<AdBanner> {
   BannerAd? _bannerAd;
   bool _isAdLoaded = false;
   String? _errorMessage;
+  Timer? _loadTimeout;
 
   @override
   void initState() {
@@ -23,26 +25,30 @@ class _AdBannerState extends State<AdBanner> {
   }
 
   void _loadBannerAd() {
-    // IDs de prueba de AdMob (funcionan en iOS y Android)
-    // Reemplazar con tus IDs reales cuando publiques la app
+    _errorMessage = null;
+    _isAdLoaded = false;
     final adUnitId = _getAdUnitId();
 
     _bannerAd = BannerAd(
       adUnitId: adUnitId,
-      size: AdSize.largeBanner, // Banner más grande (320x100) para más ingresos
+      size: AdSize.largeBanner,
       request: const AdRequest(),
       listener: BannerAdListener(
         onAdLoaded: (_) {
-          setState(() {
-            _isAdLoaded = true;
-          });
+          _loadTimeout?.cancel();
+          _loadTimeout = null;
+          if (mounted) setState(() => _isAdLoaded = true);
         },
         onAdFailedToLoad: (ad, error) {
+          _loadTimeout?.cancel();
+          _loadTimeout = null;
           print('❌ Error al cargar banner: $error');
-          setState(() {
-            _isAdLoaded = false;
-            _errorMessage = error.message;
-          });
+          if (mounted) {
+            setState(() {
+              _isAdLoaded = false;
+              _errorMessage = error.message;
+            });
+          }
           ad.dispose();
         },
         onAdOpened: (_) => print('✅ Banner abierto'),
@@ -51,36 +57,40 @@ class _AdBannerState extends State<AdBanner> {
     );
 
     _bannerAd?.load();
+
+    // Si no carga en 12 s, mostrar "Anuncio no disponible" en lugar de quedar en "Cargando..."
+    _loadTimeout = Timer(const Duration(seconds: 12), () {
+      if (!mounted || _isAdLoaded || _errorMessage != null) return;
+      _loadTimeout = null;
+      setState(() {
+        _errorMessage = 'Tiempo de espera agotado';
+        _bannerAd?.dispose();
+        _bannerAd = null;
+      });
+    });
   }
 
   String _getAdUnitId() {
-    // IDs de AdMob
-    // IMPORTANTE: Usar test IDs durante desarrollo
-    // Los anuncios reales solo funcionan cuando la app está publicada en App Store/Play Store
+    // Debug = test IDs. Release (TestFlight, App Store) = IDs reales de producción.
+    const testIos = 'ca-app-pub-3940256099942544/2934735716';
+    const testAndroid = 'ca-app-pub-3940256099942544/6300978111';
+    const realIos = 'ca-app-pub-6119092953994163/2879928015';
+    // Crear unidad "Banner" para la app Android en AdMob y reemplazar el número por el ID que te den:
+    const realAndroid = 'ca-app-pub-6119092953994163/2879928015'; // Reemplazar /2879928015 por tu Android banner unit ID
 
-    // Test IDs (funcionan siempre, no generan ingresos)
-    // iOS Test: ca-app-pub-3940256099942544/2934735716
-    // Android Test: ca-app-pub-3940256099942544/6300978111
-
-    // IDs Reales (solo funcionan cuando la app está publicada)
-    // iOS Real: ca-app-pub-6119092953994163/2879928015
-    // Android Real: (configurar cuando crees la app en AdMob)
-
-    // Detecta automáticamente la plataforma
+    final useReal = kReleaseMode;
     if (Platform.isAndroid) {
-      return 'ca-app-pub-3940256099942544/6300978111'; // Test ID Android
-    } else if (Platform.isIOS) {
-      // Cambiar a test ID durante desarrollo, real cuando publiques
-      return 'ca-app-pub-3940256099942544/2934735716'; // Test ID iOS (cambiar a real cuando publiques)
-      // return 'ca-app-pub-6119092953994163/2879928015'; // Real ID iOS (descomentar cuando publiques)
+      return useReal ? realAndroid : testAndroid;
     }
-
-    // Fallback
-    return 'ca-app-pub-3940256099942544/2934735716'; // Test ID iOS
+    if (Platform.isIOS) {
+      return useReal ? realIos : testIos;
+    }
+    return useReal ? realIos : testIos;
   }
 
   @override
   void dispose() {
+    _loadTimeout?.cancel();
     _bannerAd?.dispose();
     super.dispose();
   }
@@ -100,7 +110,7 @@ class _AdBannerState extends State<AdBanner> {
         ),
         child: Center(
           child: Text(
-            'Error al cargar anuncio',
+            kReleaseMode ? 'Anuncio no disponible' : 'Error al cargar anuncio',
             style: TextStyle(
               color: Theme.of(context).brightness == Brightness.dark
                   ? Colors.grey[400]

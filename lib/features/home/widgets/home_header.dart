@@ -2,9 +2,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 class HomeHeader extends StatefulWidget {
+  /// Cuándo se refrescaron los datos (para "Refrescado hace X").
   final DateTime updatedAt;
+  /// Timestamp de la última medición del backend (para "Última actualización: ...").
+  final DateTime? lastMeasurementAt;
 
-  const HomeHeader({super.key, required this.updatedAt});
+  const HomeHeader({
+    super.key,
+    required this.updatedAt,
+    this.lastMeasurementAt,
+  });
 
   @override
   State<HomeHeader> createState() => _HomeHeaderState();
@@ -54,10 +61,18 @@ class _HomeHeaderState extends State<HomeHeader> {
   @override
   void didUpdateWidget(HomeHeader oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Si cambió la fecha de actualización, actualizar el texto inmediatamente
     if (oldWidget.updatedAt != widget.updatedAt) {
       _updateTimeAgo();
     }
+  }
+
+  static String _formatLastMeasurement(DateTime d) {
+    final y = d.year;
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    final h = d.hour.toString().padLeft(2, '0');
+    final min = d.minute.toString().padLeft(2, '0');
+    return '$y-$m-$day $h:$min';
   }
 
   @override
@@ -98,20 +113,33 @@ class _HomeHeaderState extends State<HomeHeader> {
               filterQuality: FilterQuality.high,
             ),
           ),
-          const SizedBox(height: 1), // Espacio mínimo entre logo y texto
-          // Texto de actualización centrado - más grande y en cursiva
+          const SizedBox(height: 1),
+          // "Refrescado hace un momento" / "Refrescado hace 2 min"
           Text(
-            'Actualizado $_timeAgoText',
+            'Refrescado $_timeAgoText',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontSize: 12, // Más grande
+                  fontSize: 12,
                   fontWeight: FontWeight.w400,
-                  fontStyle: FontStyle.italic, // Cursiva
+                  fontStyle: FontStyle.italic,
                   letterSpacing: 0.2,
                 ),
             textAlign: TextAlign.center,
           ),
+          if (widget.lastMeasurementAt != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Última actualización: ${_formatLastMeasurement(widget.lastMeasurementAt!)}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w400,
+                    color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.85),
+                    letterSpacing: 0.1,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+          ],
           const SizedBox(height: 8),
-          // Línea divisoria mejorada con gradiente y sombra
+          // Línea divisoria
           Container(
             height: 1,
             decoration: BoxDecoration(

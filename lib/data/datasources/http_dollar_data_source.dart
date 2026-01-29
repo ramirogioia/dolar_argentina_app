@@ -14,34 +14,48 @@ class HttpDollarDataSource implements DollarDataSource {
       : baseUrl =
             (baseUrl != null && baseUrl.isNotEmpty) ? baseUrl : apiBaseUrl;
 
+  static const _timeoutSeconds = 30;
+  static const _maxRetries = 2;
+
   @override
   Future<DollarSnapshot> getDollarRates() async {
     try {
-      // Obtener la fecha actual en formato YYYY-MM-DD
       final now = DateTime.now();
       final dateStr =
           '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-
-      // Construir la URL del JSON del día actual (formato: cotizaciones_YYYY-MM-DD.json)
-      // Usar raw.githubusercontent.com para obtener el archivo raw, no la página HTML
       final url = Uri.parse('$baseUrl/cotizaciones_$dateStr.json');
 
-      // Debug: imprimir la URL que se está intentando
       print('🔍 Intentando obtener datos de: ${url.toString()}');
 
-      // Hacer la petición HTTP con headers para evitar redirecciones a HTML
-      final response = await http.get(
-        url,
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'DolarArgentinaApp/1.0',
-        },
-      ).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () {
-          throw Exception('Timeout al obtener datos del servidor');
-        },
-      );
+      // Reintento en timeout (emulador y redes lentas)
+      http.Response? response;
+      Object? lastError;
+      for (var attempt = 1; attempt <= _maxRetries; attempt++) {
+        try {
+          response = await http.get(
+            url,
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'DolarArgentinaApp/1.0',
+            },
+          ).timeout(
+            const Duration(seconds: _timeoutSeconds),
+            onTimeout: () {
+              throw Exception('Timeout al obtener datos del servidor');
+            },
+          );
+          break;
+        } catch (e) {
+          lastError = e;
+          if (attempt < _maxRetries) {
+            print('⚠️ Intento $attempt falló ($e), reintentando en 2s...');
+            await Future<void>.delayed(const Duration(seconds: 2));
+          }
+        }
+      }
+      if (response == null) {
+        throw lastError ?? Exception('Error al obtener datos del servidor');
+      }
 
       print(
           '📡 Respuesta recibida - Status: ${response.statusCode}, Content-Type: ${response.headers['content-type']}');
@@ -59,34 +73,44 @@ class HttpDollarDataSource implements DollarDataSource {
         print(
             '🔍 Intentando obtener datos de ayer: ${yesterdayUrl.toString()}');
 
-        final yesterdayResponse = await http.get(
-          yesterdayUrl,
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'DolarArgentinaApp/1.0',
-          },
-        ).timeout(
-          const Duration(seconds: 15),
-          onTimeout: () {
-            throw Exception('Timeout al obtener datos del servidor');
-          },
-        );
+        http.Response? yesterdayResponse;
+        for (var attempt = 1; attempt <= _maxRetries; attempt++) {
+          try {
+            yesterdayResponse = await http.get(
+              yesterdayUrl,
+              headers: {
+                'Accept': 'application/json',
+                'User-Agent': 'DolarArgentinaApp/1.0',
+              },
+            ).timeout(
+              const Duration(seconds: _timeoutSeconds),
+              onTimeout: () {
+                throw Exception('Timeout al obtener datos del servidor');
+              },
+            );
+            break;
+          } catch (e) {
+            if (attempt == _maxRetries) rethrow;
+            print('⚠️ Intento ayer $attempt falló, reintentando...');
+            await Future<void>.delayed(const Duration(seconds: 2));
+          }
+        }
+        final respAyer = yesterdayResponse!;
 
-        print('📡 Respuesta de ayer - Status: ${yesterdayResponse.statusCode}');
+        print('📡 Respuesta de ayer - Status: ${respAyer.statusCode}');
 
-        if (yesterdayResponse.statusCode != 200) {
-          final preview = yesterdayResponse.body.length > 200
-              ? yesterdayResponse.body.substring(0, 200)
-              : yesterdayResponse.body;
+        if (respAyer.statusCode != 200) {
+          final preview = respAyer.body.length > 200
+              ? respAyer.body.substring(0, 200)
+              : respAyer.body;
           throw Exception('No se encontraron datos para hoy ni para ayer.\n\n'
               'URLs intentadas:\n'
               '• Hoy: ${url.toString()}\n'
               '• Ayer: ${yesterdayUrl.toString()}\n\n'
-              'Respuesta de ayer (${yesterdayResponse.statusCode}): ${preview}...');
+              'Respuesta de ayer (${respAyer.statusCode}): ${preview}...');
         }
 
-        // Validar que la respuesta sea JSON y no HTML
-        final bodyPreview = yesterdayResponse.body.trim();
+        final bodyPreview = respAyer.body.trim();
         if (bodyPreview.startsWith('<!') ||
             bodyPreview.startsWith('<html') ||
             bodyPreview.toLowerCase().contains('<!doctype')) {
@@ -99,7 +123,7 @@ class HttpDollarDataSource implements DollarDataSource {
         }
 
         print('✅ JSON válido de ayer recibido, parseando...');
-        return await _parseResponse(yesterdayResponse.body);
+        return await _parseResponse(respAyer.body);
       }
 
       // Si llegamos aquí, el status code es 200
@@ -162,6 +186,23 @@ class HttpDollarDataSource implements DollarDataSource {
       final ultimaCorrida = json['ultima_corrida'] as Map<String, dynamic>?;
       if (ultimaCorrida == null) {
         throw Exception('El JSON no contiene "ultima_corrida"');
+      }
+      // "Última actualización: ..." debe mostrar el dato del backend (ultima_actualizacion).
+      // Si no existe, usar el timestamp de la última corrida del array.
+      DateTime? lastMeasurementAt;
+      final ultimaActualizacion = json['ultima_actualizacion'];
+      if (ultimaActualizacion != null) {
+        lastMeasurementAt = _parseTimestamp(ultimaActualizacion);
+      }
+      if (lastMeasurementAt == null) {
+        final corridas = json['corridas'] as List<dynamic>?;
+        if (corridas != null && corridas.isNotEmpty) {
+          final ultima = corridas.last as Map<String, dynamic>;
+          lastMeasurementAt = _parseTimestamp(ultima['timestamp']);
+        }
+      }
+      if (lastMeasurementAt == null) {
+        lastMeasurementAt = _parseTimestamp(ultimaCorrida['timestamp']);
       }
 
       // Obtener las corridas para calcular variaciones
@@ -289,6 +330,7 @@ class HttpDollarDataSource implements DollarDataSource {
 
       final snapshot = DollarSnapshot(
         updatedAt: updatedAt,
+        lastMeasurementAt: lastMeasurementAt,
         rates: rates,
       );
 

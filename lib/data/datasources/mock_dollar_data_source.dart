@@ -50,6 +50,7 @@ class MockDollarDataSource implements DollarDataSource {
 
     return DollarSnapshot(
       updatedAt: DateTime.now(),
+      lastMeasurementAt: DateTime.now(),
       rates: rates,
     );
   }

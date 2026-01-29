@@ -4,9 +4,13 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     
     <application
-        android:label="dolar_argentina_app"
+        android:label="Dólar Argentina"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- Icono de notificación (blanco/transparente para FCM en background) -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification"/>
         <!-- AdMob App ID (Test ID para desarrollo) -->
         <!-- Reemplazar con tu App ID real cuando publiques -->
         <meta-data

@@ -8,6 +8,10 @@ import UIKit
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
+    // Registrar para notificaciones remotas (APNs). Necesario para que FCM entregue en iOS.
+    if #available(iOS 10.0, *) {
+      application.registerForRemoteNotifications()
+    }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 }

@@ -5,7 +5,7 @@
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>CFBundleDisplayName</key>
-		<string>Dólar Argentina</string>
+		<string>Dólar ARG</string>
 		<key>CFBundleExecutable</key>
 		<string>$(EXECUTABLE_NAME)</string>
 		<key>CFBundleIdentifier</key>
@@ -54,10 +54,8 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
-	<!-- AdMob App ID -->
-	<!-- IMPORTANTE: Usar test ID durante desarrollo, real cuando publiques -->
+	<!-- AdMob App ID (real: necesario para TestFlight y App Store) -->
 	<key>GADApplicationIdentifier</key>
-	<string>ca-app-pub-3940256099942544~1458002511</string>
-	<!-- Real ID (descomentar cuando publiques): ca-app-pub-6119092953994163~6222015453 -->
+	<string>ca-app-pub-6119092953994163~6222015453</string>
 </dict>
 </plist>

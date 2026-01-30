@@ -18,9 +18,8 @@ bool _firebaseInitialized = false;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Con barra de estado visible las capturas se aceptan en App Store (como Impostor).
-  // Para pantalla limpia de nuevo: cambiar a SystemUiMode.immersiveSticky.
-  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  // Modo inmersivo: oculta barras del sistema para screenshots limpios
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
   // Inicializar Firebase (debe ser antes de cualquier otro servicio de Firebase)
   try {

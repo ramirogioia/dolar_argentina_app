@@ -17,21 +17,51 @@ class _AdBannerState extends State<AdBanner> {
   bool _isAdLoaded = false;
   String? _errorMessage;
   Timer? _loadTimeout;
+  AdSize? _currentAdSize;
 
   @override
   void initState() {
     super.initState();
-    _loadBannerAd();
+    // No podemos cargar aquí porque no tenemos contexto
+    // Cargaremos en el primer build
   }
 
-  void _loadBannerAd() {
+  // Detecta si es tablet (ancho >= 600px)
+  bool _isTablet(BuildContext context) {
+    return MediaQuery.of(context).size.shortestSide >= 600;
+  }
+
+  // Obtiene el tamaño de banner apropiado según el dispositivo
+  AdSize _getAdSize(BuildContext context) {
+    if (_isTablet(context)) {
+      // Para tablets: Leaderboard (728x90) - ancho completo, mejor para tablets
+      return AdSize.leaderboard;
+    }
+    // Para phones: Large Banner (320x100) - funciona bien en móviles
+    return AdSize.largeBanner;
+  }
+
+  void _loadBannerAdWithContext(BuildContext context) {
+    if (_bannerAd != null && _isAdLoaded) {
+      // Si ya hay un banner cargado y el tamaño es correcto, no recargar
+      final newSize = _getAdSize(context);
+      if (_currentAdSize == newSize) {
+        return;
+      }
+      // Si cambió el tamaño, limpiar el anterior
+      _bannerAd?.dispose();
+      _bannerAd = null;
+      _isAdLoaded = false;
+    }
+    
     _errorMessage = null;
     _isAdLoaded = false;
     final adUnitId = _getAdUnitId();
+    _currentAdSize = _getAdSize(context);
 
     _bannerAd = BannerAd(
       adUnitId: adUnitId,
-      size: AdSize.largeBanner, // 320x100: más facturación, sin comer mucho scroll
+      size: _currentAdSize!,
       request: const AdRequest(),
       listener: BannerAdListener(
         onAdLoaded: (_) {
@@ -66,6 +96,7 @@ class _AdBannerState extends State<AdBanner> {
         _errorMessage = 'Tiempo de espera agotado';
         _bannerAd?.dispose();
         _bannerAd = null;
+        _currentAdSize = null;
       });
     });
   }
@@ -97,11 +128,23 @@ class _AdBannerState extends State<AdBanner> {
 
   @override
   Widget build(BuildContext context) {
+    // Cargar el banner en el primer build o si cambió el tamaño
+    _loadBannerAdWithContext(context);
+    
+    final isTablet = _isTablet(context);
+    final adSize = _getAdSize(context);
+    final bannerHeight = adSize.height.toDouble();
+    
     // Si hay error, mostrar mensaje
     if (_errorMessage != null) {
       return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        height: 100, // Mismo alto que Large Banner (320x100)
+        margin: EdgeInsets.only(
+          left: isTablet ? 0 : 16,
+          right: isTablet ? 0 : 16,
+          top: 8,
+          bottom: 8,
+        ),
+        height: bannerHeight,
         decoration: BoxDecoration(
           color: Theme.of(context).brightness == Brightness.dark
               ? const Color(0xFF2C2C2C)
@@ -125,8 +168,13 @@ class _AdBannerState extends State<AdBanner> {
     // Si no está cargado, mostrar placeholder
     if (!_isAdLoaded || _bannerAd == null) {
       return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        height: 100, // Mismo alto que Large Banner (320x100)
+        margin: EdgeInsets.only(
+          left: isTablet ? 0 : 16,
+          right: isTablet ? 0 : 16,
+          top: 8,
+          bottom: 8,
+        ),
+        height: bannerHeight,
         decoration: BoxDecoration(
           color: Theme.of(context).brightness == Brightness.dark
               ? const Color(0xFF2C2C2C)
@@ -152,11 +200,16 @@ class _AdBannerState extends State<AdBanner> {
       );
     }
 
-    // Large Banner = 320x100
+    // Banner adaptativo según dispositivo
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: EdgeInsets.only(
+        left: isTablet ? 0 : 16,
+        right: isTablet ? 0 : 16,
+        top: 8,
+        bottom: 8,
+      ),
       width: double.infinity,
-      height: _bannerAd!.size.height.toDouble(),
+      height: bannerHeight,
       alignment: Alignment.center,
       child: AdWidget(ad: _bannerAd!),
     );

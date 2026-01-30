@@ -23,7 +23,12 @@ class HttpDollarDataSource implements DollarDataSource {
       final now = DateTime.now();
       final dateStr =
           '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-      final url = Uri.parse('$baseUrl/cotizaciones_$dateStr.json');
+      // Agregar timestamp como query param para evitar caché
+      final url = Uri.parse('$baseUrl/cotizaciones_$dateStr.json').replace(
+        queryParameters: {
+          '_t': DateTime.now().millisecondsSinceEpoch.toString(),
+        },
+      );
 
       print('🔍 Intentando obtener datos de: ${url.toString()}');
 
@@ -37,6 +42,8 @@ class HttpDollarDataSource implements DollarDataSource {
             headers: {
               'Accept': 'application/json',
               'User-Agent': 'DolarArgentinaApp/1.0',
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
             },
           ).timeout(
             const Duration(seconds: _timeoutSeconds),
@@ -81,6 +88,8 @@ class HttpDollarDataSource implements DollarDataSource {
               headers: {
                 'Accept': 'application/json',
                 'User-Agent': 'DolarArgentinaApp/1.0',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
               },
             ).timeout(
               const Duration(seconds: _timeoutSeconds),
@@ -183,10 +192,13 @@ class HttpDollarDataSource implements DollarDataSource {
       final updatedAt = DateTime.now();
 
       // Obtener la última corrida (valores más recientes)
+      final fechaArchivo = json['fecha'] as String?;
+      print('📅 DEBUG - Fecha del archivo cargado: $fechaArchivo');
       final ultimaCorrida = json['ultima_corrida'] as Map<String, dynamic>?;
       if (ultimaCorrida == null) {
         throw Exception('El JSON no contiene "ultima_corrida"');
       }
+      print('📅 DEBUG - ultima_corrida timestamp: ${ultimaCorrida['timestamp']}');
       // "Última actualización: ..." debe mostrar el dato del backend (ultima_actualizacion).
       // Si no existe, usar el timestamp de la última corrida del array.
       DateTime? lastMeasurementAt;
@@ -205,13 +217,10 @@ class HttpDollarDataSource implements DollarDataSource {
         lastMeasurementAt = _parseTimestamp(ultimaCorrida['timestamp']);
       }
 
-      // Obtener las corridas para calcular variaciones
-      // Buscar el valor de hace 24 horas: primero en el archivo de hoy, luego en el de ayer
-      final corridas = json['corridas'] as List<dynamic>?;
-      Map<String, dynamic>? corridaComparacion;
-
-      // Intentar cargar el archivo de ayer para comparar con hace 24 horas
-      Map<String, dynamic>? jsonAyer;
+      // Obtener el último valor de AYER para comparar con el último de HOY
+      // Simplemente: último de hoy vs último de ayer (ambos ultima_corrida)
+      Map<String, dynamic>? ultimaCorridaAyer;
+      
       try {
         final now = DateTime.now();
         final yesterday = now.subtract(const Duration(days: 1));
@@ -221,107 +230,54 @@ class HttpDollarDataSource implements DollarDataSource {
             Uri.parse('$baseUrl/cotizaciones_$yesterdayStr.json');
 
         print(
-            '🔍 Intentando cargar archivo de ayer para comparación: ${yesterdayUrl.toString()}');
+            '🔍 Cargando archivo de ayer para comparar último valor: ${yesterdayUrl.toString()}');
         final yesterdayResponse = await http.get(
           yesterdayUrl,
           headers: {
             'Accept': 'application/json',
             'User-Agent': 'DolarArgentinaApp/1.0',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
           },
         ).timeout(const Duration(seconds: 10));
 
         if (yesterdayResponse.statusCode == 200) {
           final body = yesterdayResponse.body.trim();
           if (!body.startsWith('<!') && !body.startsWith('<html')) {
-            jsonAyer = jsonDecode(body) as Map<String, dynamic>;
-            print('✅ Archivo de ayer cargado exitosamente para comparación');
-          }
-        }
-      } catch (e) {
-        print('⚠️ No se pudo cargar archivo de ayer para comparación: $e');
-      }
-
-      // Combinar corridas de hoy y ayer para buscar la más cercana a hace 24 horas
-      final todasLasCorridas = <Map<String, dynamic>>[];
-      if (corridas != null) {
-        todasLasCorridas.addAll(corridas.map((c) => c as Map<String, dynamic>));
-      }
-
-      // Agregar corridas del archivo de ayer si está disponible
-      if (jsonAyer != null) {
-        final corridasAyer = jsonAyer['corridas'] as List<dynamic>?;
-        if (corridasAyer != null) {
-          todasLasCorridas
-              .addAll(corridasAyer.map((c) => c as Map<String, dynamic>));
-          print(
-              '📊 Combinadas ${corridas?.length ?? 0} corridas de hoy con ${corridasAyer.length} de ayer');
-        }
-      }
-
-      if (todasLasCorridas.isNotEmpty) {
-        final now = DateTime.now();
-        final hace24Horas = now.subtract(const Duration(hours: 24));
-        final inicioDelDia = DateTime(now.year, now.month, now.day, 0, 0, 0);
-
-        // Ordenar por timestamp (más antiguo primero para buscar el más cercano a hace 24h)
-        todasLasCorridas.sort((a, b) {
-          final tsA = _parseTimestamp(a['timestamp']);
-          final tsB = _parseTimestamp(b['timestamp']);
-          return tsA.compareTo(tsB);
-        });
-
-        // Buscar la corrida más cercana a hace 24 horas en todas las corridas (hoy + ayer)
-        Map<String, dynamic>? corridaMasCercana24h;
-        Duration? diferenciaMinima;
-
-        for (final corrida in todasLasCorridas) {
-          final timestamp = _parseTimestamp(corrida['timestamp']);
-          final diferencia = timestamp.difference(hace24Horas).abs();
-
-          if (diferenciaMinima == null || diferencia < diferenciaMinima) {
-            diferenciaMinima = diferencia;
-            corridaMasCercana24h = corrida;
-          }
-        }
-
-        // Si encontramos una corrida de hace menos de 30 horas, usarla
-        // Si no, usar la primera corrida del día (apertura)
-        if (corridaMasCercana24h != null &&
-            diferenciaMinima != null &&
-            diferenciaMinima < const Duration(hours: 30)) {
-          corridaComparacion = corridaMasCercana24h;
-          print(
-              '✅ Usando corrida de hace 24h: ${_parseTimestamp(corridaMasCercana24h['timestamp'])} (diferencia: ${diferenciaMinima.inHours}h ${diferenciaMinima.inMinutes % 60}m)');
-        } else {
-          // Buscar la primera corrida del día (apertura)
-          for (final corrida in todasLasCorridas) {
-            final timestamp = _parseTimestamp(corrida['timestamp']);
-            if (timestamp.isAfter(inicioDelDia) ||
-                timestamp.isAtSameMomentAs(inicioDelDia)) {
-              corridaComparacion = corrida;
-              print(
-                  '✅ Usando primera corrida del día (apertura): ${timestamp}');
-              break;
+            final jsonAyer = jsonDecode(body) as Map<String, dynamic>;
+            final fechaArchivoAyer = jsonAyer['fecha'] as String?;
+            print('📅 DEBUG - Fecha del archivo de AYER cargado: $fechaArchivoAyer');
+            ultimaCorridaAyer = jsonAyer['ultima_corrida'] as Map<String, dynamic>?;
+            if (ultimaCorridaAyer != null) {
+              print('✅ Última corrida de ayer cargada exitosamente para comparación');
+              print('📅 DEBUG - ultima_corrida AYER timestamp: ${ultimaCorridaAyer['timestamp']}');
+            } else {
+              print('⚠️ El archivo de ayer no tiene ultima_corrida');
             }
           }
-          // Si no hay corrida del día actual, usar la primera disponible
-          if (corridaComparacion == null && todasLasCorridas.isNotEmpty) {
-            corridaComparacion = todasLasCorridas.first;
-            print(
-                '✅ Usando primera corrida disponible: ${_parseTimestamp(todasLasCorridas.first['timestamp'])}');
-          }
+        } else {
+          print('⚠️ No se pudo cargar archivo de ayer (status: ${yesterdayResponse.statusCode})');
         }
+      } catch (e) {
+        print('⚠️ Error al cargar archivo de ayer para comparación: $e');
       }
 
+      // Obtener el array de corridas para búsqueda hacia atrás cuando hay valores null
+      final corridas = json['corridas'] as List<dynamic>?;
+      final ultimaCorridaTimestamp = _parseTimestamp(ultimaCorrida['timestamp']);
+      
       // Construir la lista de DollarRate
       final rates = <DollarRate>[];
 
       // Mapear cada tipo de dólar
+      // Comparar: último de HOY (ultimaCorrida) vs último de AYER (ultimaCorridaAyer)
       for (final dollarType in DollarType.values) {
         final rate = _extractDollarRate(
           ultimaCorrida,
-          corridaComparacion,
+          ultimaCorridaAyer,
           dollarType,
+          corridas: corridas,
+          ultimaCorridaTimestamp: ultimaCorridaTimestamp,
         );
         if (rate != null) {
           rates.add(rate);
@@ -344,13 +300,64 @@ class HttpDollarDataSource implements DollarDataSource {
     }
   }
 
+  /// Busca el último valor válido (no null) en las corridas de las últimas 2 horas
+  /// para un banco o plataforma específica
+  Map<String, dynamic>? _findLastValidValueInCorridas(
+    List<dynamic>? corridas,
+    DateTime? ultimaCorridaTimestamp,
+    String typeKey,
+    String entityKey, // 'nacion', 'binance', etc.
+  ) {
+    if (corridas == null || corridas.isEmpty || ultimaCorridaTimestamp == null) {
+      return null;
+    }
+    
+    final twoHoursAgo = ultimaCorridaTimestamp.subtract(const Duration(hours: 2));
+    
+    // Ordenar corridas por timestamp descendente (más recientes primero)
+    final sortedCorridas = List<Map<String, dynamic>>.from(corridas)
+      ..sort((a, b) {
+        final tsA = _parseTimestamp(a['timestamp']);
+        final tsB = _parseTimestamp(b['timestamp']);
+        return tsB.compareTo(tsA);
+      });
+    
+    // Buscar el último valor válido en las últimas 2 horas
+    for (final corrida in sortedCorridas) {
+      final timestamp = _parseTimestamp(corrida['timestamp']);
+      if (timestamp.isBefore(twoHoursAgo)) {
+        continue; // Fuera del rango de 2 horas
+      }
+      
+      final typeData = corrida[typeKey] as Map<String, dynamic>?;
+      if (typeData == null) continue;
+      
+      final entityData = typeData[entityKey] as Map<String, dynamic>?;
+      if (entityData == null) continue;
+      
+      final compra = _parseDouble(entityData['compra']);
+      final venta = _parseDouble(entityData['venta']);
+      
+      // Si tiene al menos un valor válido, retornarlo
+      if (compra != null || venta != null) {
+        return entityData;
+      }
+    }
+    
+    return null; // No se encontró ningún valor válido en las últimas 2 horas
+  }
+
   /// Extrae un DollarRate para un tipo específico de dólar
-  /// [corridaComparacion] puede ser la corrida de hace 24h o la primera del día (apertura)
+  /// [ultimaCorridaAyer] es la ultima_corrida del archivo de ayer para comparar con la de hoy
+  /// [corridas] es el array de corridas para buscar valores válidos cuando hay null
+  /// [ultimaCorridaTimestamp] es el timestamp de la última corrida para calcular las últimas 2 horas
   DollarRate? _extractDollarRate(
     Map<String, dynamic> ultimaCorrida,
-    Map<String, dynamic>? corridaComparacion,
-    DollarType dollarType,
-  ) {
+    Map<String, dynamic>? ultimaCorridaAyer,
+    DollarType dollarType, {
+    List<dynamic>? corridas,
+    DateTime? ultimaCorridaTimestamp,
+  }) {
     final typeKey = _getDollarTypeKey(dollarType);
 
     // Buscar el valor en la última corrida
@@ -363,31 +370,66 @@ class HttpDollarDataSource implements DollarDataSource {
 
     if (dollarType == DollarType.official) {
       // Para dólar oficial, necesitamos seleccionar un banco
-      // Por defecto usamos "nacion", pero podríamos hacer un promedio
+      // Por defecto usamos "nacion", pero intentamos mantener consistencia
+      String? bancoSeleccionado;
       final bancoData = latestData['nacion'] as Map<String, dynamic>?;
       if (bancoData == null) {
         // Si no hay nacion, buscar el primer banco disponible
         final bancos = latestData.keys.toList();
         if (bancos.isEmpty) return null;
-        final primerBanco = bancos.first;
+        bancoSeleccionado = bancos.first;
         final primerBancoData =
-            latestData[primerBanco] as Map<String, dynamic>?;
+            latestData[bancoSeleccionado] as Map<String, dynamic>?;
         if (primerBancoData == null) return null;
         buy = _parseDouble(primerBancoData['compra']);
         sell = _parseDouble(primerBancoData['venta']);
       } else {
+        bancoSeleccionado = 'nacion';
         buy = _parseDouble(bancoData['compra']);
         sell = _parseDouble(bancoData['venta']);
       }
 
-      // Calcular variación comparando con la corrida de referencia (hace 24h o apertura)
-      if (corridaComparacion != null && buy != null) {
+      // Si algún valor es null, buscar hacia atrás en las últimas 2 horas
+      if ((buy == null || sell == null) && 
+          corridas != null && 
+          ultimaCorridaTimestamp != null) {
+        final validData = _findLastValidValueInCorridas(
+          corridas,
+          ultimaCorridaTimestamp,
+          typeKey,
+          bancoSeleccionado,
+        );
+        if (validData != null) {
+          if (buy == null) {
+            buy = _parseDouble(validData['compra']);
+            print('🔍 Valor de compra null para $bancoSeleccionado, usando último valor válido: $buy');
+          }
+          if (sell == null) {
+            sell = _parseDouble(validData['venta']);
+            print('🔍 Valor de venta null para $bancoSeleccionado, usando último valor válido: $sell');
+          }
+        }
+      }
+
+      // Calcular variación comparando último de HOY con último de AYER
+      // IMPORTANTE: Comparar el mismo banco en ambos momentos
+      if (ultimaCorridaAyer != null && buy != null) {
         final previousData =
-            corridaComparacion[typeKey] as Map<String, dynamic>?;
+            ultimaCorridaAyer[typeKey] as Map<String, dynamic>?;
         if (previousData != null) {
+          // Buscar el mismo banco en los datos anteriores
           final previousBancoData =
-              previousData['nacion'] as Map<String, dynamic>?;
-          if (previousBancoData == null) {
+              previousData[bancoSeleccionado] as Map<String, dynamic>?;
+          if (previousBancoData != null) {
+            final previousBuy = _parseDouble(previousBancoData['compra']);
+            if (previousBuy != null && previousBuy > 0) {
+              changePercent = ((buy - previousBuy) / previousBuy) * 100;
+              print('✅ Variación oficial ($bancoSeleccionado): ${buy} vs ${previousBuy} = ${changePercent.toStringAsFixed(2)}%');
+            } else {
+              print('⚠️ No se pudo parsear previousBuy para $bancoSeleccionado');
+            }
+          } else {
+            // Si no existe el mismo banco, intentar con el primer banco disponible
             final bancos = previousData.keys.toList();
             if (bancos.isNotEmpty) {
               final primerBanco = bancos.first;
@@ -397,49 +439,93 @@ class HttpDollarDataSource implements DollarDataSource {
                 final previousBuy = _parseDouble(primerBancoData['compra']);
                 if (previousBuy != null && previousBuy > 0) {
                   changePercent = ((buy - previousBuy) / previousBuy) * 100;
+                  print('⚠️ Usando banco diferente para comparación: $bancoSeleccionado vs $primerBanco');
                 }
               }
-            }
-          } else {
-            final previousBuy = _parseDouble(previousBancoData['compra']);
-            if (previousBuy != null && previousBuy > 0) {
-              changePercent = ((buy - previousBuy) / previousBuy) * 100;
+            } else {
+              print('⚠️ No hay bancos disponibles en datos anteriores para comparar');
             }
           }
+        } else {
+          print('⚠️ No hay datos anteriores (ultimaCorridaAyer) para calcular variación oficial');
         }
       }
       // Si no hay corrida de comparación o no se pudo calcular, usar 0.0 por defecto
       if (changePercent == null && buy != null) {
         changePercent = 0.0;
+        print('⚠️ No se pudo calcular variación para oficial, usando 0.0%');
       }
     } else if (dollarType == DollarType.crypto) {
       // Para dólar crypto, necesitamos seleccionar una plataforma
-      // Por defecto usamos "binance"
+      // Por defecto usamos "binance", pero intentamos mantener consistencia
+      String? plataformaSeleccionada;
       final plataformaData = latestData['binance'] as Map<String, dynamic>?;
       if (plataformaData == null) {
         // Si no hay binance, buscar la primera plataforma disponible
         final plataformas = latestData.keys.toList();
         if (plataformas.isEmpty) return null;
-        final primeraPlataforma = plataformas.first;
+        plataformaSeleccionada = plataformas.first;
         final primeraPlataformaData =
-            latestData[primeraPlataforma] as Map<String, dynamic>?;
+            latestData[plataformaSeleccionada] as Map<String, dynamic>?;
         if (primeraPlataformaData == null) return null;
         buy = _parseDouble(primeraPlataformaData['compra']);
         sell = _parseDouble(primeraPlataformaData['venta']);
       } else {
+        plataformaSeleccionada = 'binance';
         buy = _parseDouble(plataformaData['compra']);
         sell = _parseDouble(plataformaData['venta']);
       }
 
-      // Calcular variación comparando con la corrida de referencia (hace 24h o apertura)
-      if (corridaComparacion != null && buy != null) {
+      // Si algún valor es null, buscar hacia atrás en las últimas 2 horas
+      if ((buy == null || sell == null) && 
+          corridas != null && 
+          ultimaCorridaTimestamp != null) {
+        final validData = _findLastValidValueInCorridas(
+          corridas,
+          ultimaCorridaTimestamp,
+          typeKey,
+          plataformaSeleccionada,
+        );
+        if (validData != null) {
+          if (buy == null) {
+            buy = _parseDouble(validData['compra']);
+            print('🔍 Valor de compra null para $plataformaSeleccionada, usando último valor válido: $buy');
+          }
+          if (sell == null) {
+            sell = _parseDouble(validData['venta']);
+            print('🔍 Valor de venta null para $plataformaSeleccionada, usando último valor válido: $sell');
+          }
+        }
+      }
+
+      // Calcular variación comparando último de HOY con último de AYER
+      // IMPORTANTE: Comparar la misma plataforma en ambos momentos
+      print('🔍 DEBUG Cripto - buy (HOY): $buy, plataformaSeleccionada: $plataformaSeleccionada, ultimaCorridaAyer: ${ultimaCorridaAyer != null}');
+      print('🔍 DEBUG - latestData (HOY) content: ${latestData[plataformaSeleccionada]}');
+      if (ultimaCorridaAyer != null && buy != null) {
+        print('🔍 DEBUG - typeKey: $typeKey, ultimaCorridaAyer keys: ${ultimaCorridaAyer.keys.toList()}');
         final previousData =
-            corridaComparacion[typeKey] as Map<String, dynamic>?;
+            ultimaCorridaAyer[typeKey] as Map<String, dynamic>?;
+        print('🔍 DEBUG - previousData (dolar_cripto): ${previousData != null}, keys: ${previousData?.keys.toList()}');
         if (previousData != null) {
+          // Buscar la misma plataforma en los datos anteriores
           final previousPlataformaData =
-              previousData['binance'] as Map<String, dynamic>?;
-          if (previousPlataformaData == null) {
+              previousData[plataformaSeleccionada] as Map<String, dynamic>?;
+          print('🔍 DEBUG - previousPlataformaData ($plataformaSeleccionada): ${previousPlataformaData != null}');
+          if (previousPlataformaData != null) {
+            print('🔍 DEBUG - previousPlataformaData content (AYER): $previousPlataformaData');
+            final previousBuy = _parseDouble(previousPlataformaData['compra']);
+            print('🔍 DEBUG - previousBuy parsed (AYER): $previousBuy');
+            if (previousBuy != null && previousBuy > 0) {
+              changePercent = ((buy - previousBuy) / previousBuy) * 100;
+              print('✅ Variación cripto ($plataformaSeleccionada): HOY($buy) vs AYER($previousBuy) = ${changePercent.toStringAsFixed(2)}%');
+            } else {
+              print('⚠️ No se pudo parsear previousBuy para $plataformaSeleccionada (previousBuy: $previousBuy)');
+            }
+          } else {
+            // Si no existe la misma plataforma, intentar con la primera disponible
             final plataformas = previousData.keys.toList();
+            print('⚠️ No se encontró $plataformaSeleccionada en datos anteriores. Plataformas disponibles: $plataformas');
             if (plataformas.isNotEmpty) {
               final primeraPlataforma = plataformas.first;
               final primeraPlataformaData =
@@ -449,31 +535,80 @@ class HttpDollarDataSource implements DollarDataSource {
                     _parseDouble(primeraPlataformaData['compra']);
                 if (previousBuy != null && previousBuy > 0) {
                   changePercent = ((buy - previousBuy) / previousBuy) * 100;
+                  print('⚠️ Usando plataforma diferente para comparación: $plataformaSeleccionada vs $primeraPlataforma');
                 }
               }
-            }
-          } else {
-            final previousBuy = _parseDouble(previousPlataformaData['compra']);
-            if (previousBuy != null && previousBuy > 0) {
-              changePercent = ((buy - previousBuy) / previousBuy) * 100;
+            } else {
+              print('⚠️ No hay plataformas disponibles en datos anteriores para comparar');
             }
           }
+        } else {
+          print('⚠️ No hay datos anteriores (ultimaCorridaAyer[$typeKey]) para calcular variación cripto');
+        }
+      } else {
+        if (ultimaCorridaAyer == null) {
+          print('⚠️ ultimaCorridaAyer es null - no se cargó el archivo de ayer');
+        }
+        if (buy == null) {
+          print('⚠️ buy es null - no hay valor de compra actual');
         }
       }
       // Si no hay corrida de comparación o no se pudo calcular, usar 0.0 por defecto
       if (changePercent == null && buy != null) {
         changePercent = 0.0;
+        print('⚠️ No se pudo calcular variación para cripto, usando 0.0%');
       }
     } else {
       // Para los demás tipos (blue, tarjeta, mep, ccl), la estructura es directa
       buy = _parseDouble(latestData['compra']);
       sell = _parseDouble(latestData['venta']);
 
-      // Calcular variación comparando con la corrida de referencia (hace 24h o apertura)
+      // Si algún valor es null, buscar hacia atrás en las últimas 2 horas
+      if ((buy == null || sell == null) && 
+          corridas != null && 
+          ultimaCorridaTimestamp != null) {
+        // Para estos tipos, la estructura es directa (no hay bancos/plataformas)
+        // Buscar en las corridas de las últimas 2 horas
+        final twoHoursAgo = ultimaCorridaTimestamp.subtract(const Duration(hours: 2));
+        final sortedCorridas = List<Map<String, dynamic>>.from(corridas)
+          ..sort((a, b) {
+            final tsA = _parseTimestamp(a['timestamp']);
+            final tsB = _parseTimestamp(b['timestamp']);
+            return tsB.compareTo(tsA);
+          });
+        
+        for (final corrida in sortedCorridas) {
+          final timestamp = _parseTimestamp(corrida['timestamp']);
+          if (timestamp.isBefore(twoHoursAgo)) break;
+          
+          final typeData = corrida[typeKey] as Map<String, dynamic>?;
+          if (typeData == null) continue;
+          
+          if (buy == null) {
+            final compra = _parseDouble(typeData['compra']);
+            if (compra != null) {
+              buy = compra;
+              print('🔍 Valor de compra null para $typeKey, usando último valor válido: $buy');
+            }
+          }
+          if (sell == null) {
+            final venta = _parseDouble(typeData['venta']);
+            if (venta != null) {
+              sell = venta;
+              print('🔍 Valor de venta null para $typeKey, usando último valor válido: $sell');
+            }
+          }
+          
+          // Si ya tenemos ambos valores, no necesitamos seguir buscando
+          if (buy != null && sell != null) break;
+        }
+      }
+
+      // Calcular variación comparando último de HOY con último de AYER
       // Para tarjeta, usar 'sell' si 'buy' es null
-      if (corridaComparacion != null) {
+      if (ultimaCorridaAyer != null) {
         final previousData =
-            corridaComparacion[typeKey] as Map<String, dynamic>?;
+            ultimaCorridaAyer[typeKey] as Map<String, dynamic>?;
         if (previousData != null) {
           if (dollarType == DollarType.tarjeta && buy == null && sell != null) {
             // Para tarjeta, calcular variación usando 'venta' si 'compra' es null
@@ -559,9 +694,22 @@ class HttpDollarDataSource implements DollarDataSource {
       final now = DateTime.now();
       final dateStr =
           '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-      final url = Uri.parse('$baseUrl/cotizaciones_$dateStr.json');
+      // Agregar timestamp como query param para evitar caché
+      final url = Uri.parse('$baseUrl/cotizaciones_$dateStr.json').replace(
+        queryParameters: {
+          '_t': DateTime.now().millisecondsSinceEpoch.toString(),
+        },
+      );
 
-      final response = await http.get(url).timeout(
+      final response = await http.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'DolarArgentinaApp/1.0',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      ).timeout(
         const Duration(seconds: 10),
         onTimeout: () {
           return http.Response('', 408); // Timeout
@@ -574,7 +722,15 @@ class HttpDollarDataSource implements DollarDataSource {
             '${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}';
         final yesterdayUrl =
             Uri.parse('$baseUrl/cotizaciones_$yesterdayStr.json');
-        final yesterdayResponse = await http.get(yesterdayUrl).timeout(
+        final yesterdayResponse = await http.get(
+          yesterdayUrl,
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'DolarArgentinaApp/1.0',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+          },
+        ).timeout(
           const Duration(seconds: 10),
           onTimeout: () {
             return http.Response('', 408); // Timeout

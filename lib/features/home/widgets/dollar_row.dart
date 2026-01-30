@@ -19,8 +19,9 @@ class DollarRow extends ConsumerWidget {
     // Si es official, usar los valores del banco seleccionado
     DollarRate displayRate;
     if (rate.type == DollarType.crypto) {
-      final platformRates = ref.watch(cryptoPlatformRatesProvider);
+      final platformRatesAsync = ref.watch(cryptoPlatformRatesProvider);
       final selectedPlatform = ref.watch(selectedCryptoPlatformProvider);
+      final platformRates = platformRatesAsync.value ?? {};
       displayRate = platformRates[selectedPlatform] ?? rate;
       // Si el rate del provider no tiene changePercent pero el rate original sí,
       // y son de la misma plataforma, mantener el changePercent del original

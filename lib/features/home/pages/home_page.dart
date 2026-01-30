@@ -23,13 +23,10 @@ class HomePage extends ConsumerWidget {
           snapshotAsync.when(
             data: (snapshot) => RefreshIndicator(
               onRefresh: () async {
-                // Invalidar ambos providers para forzar la actualización desde GitHub
-                ref.invalidate(dollarSnapshotProvider);
-                ref.invalidate(fullJsonDataProvider);
-                // Esperar a que ambos se actualicen
+                // Forzar refresh inmediato de ambos providers para obtener datos nuevos del backend
                 await Future.wait([
-                  ref.read(dollarSnapshotProvider.future),
-                  ref.read(fullJsonDataProvider.future),
+                  ref.refresh(dollarSnapshotProvider.future),
+                  ref.refresh(fullJsonDataProvider.future),
                 ]);
               },
               color: AppTheme.primaryBlue,
@@ -241,10 +238,19 @@ class HomePage extends ConsumerWidget {
                   ],
                 ),
               ),
-              // Espacio para el banner fijo (Large Banner 100px + márgenes): leyenda visible sin tapar
+              // Espacio para el banner fijo: adaptativo según dispositivo
               SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 122,
+                child: Builder(
+                  builder: (context) {
+                    // Detectar si es tablet (ancho >= 600px)
+                    final isTablet = MediaQuery.of(context).size.shortestSide >= 600;
+                    // Leaderboard (90px) para tablets, Large Banner (100px) para phones
+                    final bannerHeight = isTablet ? 90.0 : 100.0;
+                    // Altura total: banner + márgenes verticales (8px arriba + 8px abajo = 16px)
+                    return SizedBox(
+                      height: bannerHeight + 16 + 8, // banner + márgenes + espacio superior
+                    );
+                  },
                 ),
               ),
             ],

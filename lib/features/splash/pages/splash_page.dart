@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../settings/settings_service.dart';
+import '../../../services/version_checker.dart';
+import '../../../widgets/update_dialogs.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -13,21 +15,62 @@ class SplashPage extends StatefulWidget {
 
 class _SplashPageState extends State<SplashPage> {
   String _themeMode = 'light'; // Por defecto light
+  bool _forceUpdateBlocking = false;
 
   @override
   void initState() {
     super.initState();
     _loadTheme();
-    // Mismo que main: edgeToEdge para que las capturas tengan barra de estado (App Store)
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    // Modo inmersivo: oculta barras del sistema para screenshots limpios
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-    // Esperar exactamente 2 segundos antes de navegar al home
+    // Verificar actualización en paralelo
+    _verificarActualizacion();
+
+    // Esperar exactamente 2 segundos antes de navegar al home (si no hay force update)
     Timer(const Duration(seconds: 2), () {
-      if (mounted) {
-        // Usar replace para que no se pueda volver al splash
-        context.go('/');
+      if (mounted && !_forceUpdateBlocking) {
+        _navegarAlHome();
       }
     });
+  }
+
+  Future<void> _verificarActualizacion() async {
+    try {
+      // Esperar un poco para que la UI se cargue
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      final updateInfo = await VersionChecker.verificarActualizacion();
+
+      if (mounted && updateInfo != null) {
+        if (updateInfo.type == UpdateType.force) {
+          // FORCE UPDATE: Bloquear la app
+          setState(() {
+            _forceUpdateBlocking = true;
+          });
+          mostrarDialogoForceUpdate(context, updateInfo);
+        } else if (updateInfo.type == UpdateType.kind) {
+          // KIND UPDATE: Mostrar opcionalmente (después de navegar)
+          // Esperar a que navegue primero
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted) {
+              mostrarDialogoKindUpdate(context, updateInfo);
+            }
+          });
+        }
+      }
+    } catch (e) {
+      print('❌ Error verificando actualización: $e');
+      // En caso de error, NO bloquear la app
+      // Continuar normalmente
+    }
+  }
+
+  void _navegarAlHome() {
+    if (mounted && !_forceUpdateBlocking) {
+      // Usar replace para que no se pueda volver al splash
+      context.go('/');
+    }
   }
 
   Future<void> _loadTheme() async {

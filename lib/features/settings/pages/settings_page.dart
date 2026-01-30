@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/settings_providers.dart';
 import '../../../services/fcm_service.dart';
 
@@ -187,6 +188,63 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          Card(
+            child: ExpansionTile(
+              leading: Icon(
+                Icons.link,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              title: Text(
+                'Fuentes de Información',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              subtitle: const Text(
+                'Enlaces a las fuentes oficiales de los datos',
+                style: TextStyle(fontSize: 12),
+              ),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSourceSection(
+                        context,
+                        'Dólar Oficial',
+                        [
+                          {'nombre': 'Banco Nación', 'url': 'https://www.bna.com.ar/Personas'},
+                          {'nombre': 'BBVA Argentina', 'url': 'https://www.bbva.com.ar/personas/productos/inversiones/cotizacion-moneda-extranjera.html'},
+                          {'nombre': 'Banco Supervielle', 'url': 'https://www.supervielle.com.ar/personas/inversiones/moneda-extranjera/compra-y-venta'},
+                          {'nombre': 'Banco Patagonia', 'url': 'https://ebankpersonas.bancopatagonia.com.ar/eBanking/usuarios/cotizacionMonedaExtranjera.htm'},
+                          {'nombre': 'Banco Provincia', 'url': 'https://www.bancoprovincia.com.ar/productos/inversiones/dolares_bip/dolares_bip_info_gral'},
+                          {'nombre': 'Banco Ciudad', 'url': 'https://bancociudad.com.ar/institucional/'},
+                          {'nombre': 'Banco Hipotecario', 'url': 'https://www.hipotecario.com.ar/buho-one/inversiones/cotizaciones/'},
+                          {'nombre': 'ICBC Argentina', 'url': 'https://www.icbc.com.ar/personas/start'},
+                        ],
+                        Icons.account_balance,
+                      ),
+                      const SizedBox(height: 24),
+                      _buildSourceSection(
+                        context,
+                        'Dólar Cripto',
+                        [
+                          {'nombre': 'Binance', 'url': 'https://p2p.binance.com'},
+                          {'nombre': 'KuCoin', 'url': 'https://www.kucoin.com'},
+                          {'nombre': 'Bybit', 'url': 'https://www.bybit.com'},
+                          {'nombre': 'OKX', 'url': 'https://www.okx.com'},
+                          {'nombre': 'Bitget', 'url': 'https://www.bitget.com'},
+                        ],
+                        Icons.currency_bitcoin,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -227,6 +285,76 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildSourceSection(
+    BuildContext context,
+    String title,
+    List<Map<String, String>> sources,
+    IconData icon,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...sources.map((source) {
+          return Padding(
+            padding: const EdgeInsets.only(left: 28, bottom: 8),
+            child: InkWell(
+              onTap: () async {
+                final url = Uri.parse(source['url']!);
+                if (await canLaunchUrl(url)) {
+                  await launchUrl(url, mode: LaunchMode.externalApplication);
+                } else {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('No se pudo abrir el enlace: ${source['url']}'),
+                      ),
+                    );
+                  }
+                }
+              },
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.open_in_new,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      source['nombre']!,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.primary,
+                            decoration: TextDecoration.underline,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
       ],
     );
   }

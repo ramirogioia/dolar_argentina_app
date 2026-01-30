@@ -30,7 +30,7 @@ class AppTheme {
         thickness: 1,
         space: 1,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -100,7 +100,7 @@ class AppTheme {
         thickness: 1,
         space: 1,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: const Color(0xFF1E1E1E), // Gris muy oscuro para cards
         elevation: 0,
         shape: RoundedRectangleBorder(

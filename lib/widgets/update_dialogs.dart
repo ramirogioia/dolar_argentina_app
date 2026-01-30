@@ -108,6 +108,7 @@ void mostrarDialogoForceUpdate(BuildContext context, UpdateInfo updateInfo) {
 
 /// Muestra el diálogo de actualización opcional (cancelable)
 void mostrarDialogoKindUpdate(BuildContext context, UpdateInfo updateInfo) {
+  print('🔍 [DIALOG] mostrarDialogoKindUpdate llamado con versión: ${updateInfo.version}');
   showDialog(
     context: context,
     barrierDismissible: true, // Se puede cerrar

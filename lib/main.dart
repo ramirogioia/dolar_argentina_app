@@ -11,6 +11,7 @@ import 'app/router/app_router.dart';
 import 'app/theme/app_theme.dart';
 import 'features/settings/providers/settings_providers.dart';
 import 'services/fcm_service.dart';
+import 'utils/logger.dart';
 
 /// True si Firebase se inicializó correctamente (evita crashes al usar Crashlytics/FCM).
 bool _firebaseInitialized = false;
@@ -25,10 +26,10 @@ void main() async {
   try {
     await Firebase.initializeApp();
     _firebaseInitialized = true;
-    print('✅ Firebase inicializado correctamente');
+    Logger.info('Firebase inicializado correctamente');
   } catch (e) {
-    print('❌ Error al inicializar Firebase: $e');
-    print('⚠️ Verifica que los archivos google-services.json (Android) y GoogleService-Info.plist (iOS) estén presentes');
+    Logger.error('Error al inicializar Firebase', error: e);
+    Logger.warning('Verifica que los archivos google-services.json (Android) y GoogleService-Info.plist (iOS) estén presentes');
   }
 
   // Crashlytics: solo si Firebase está listo; handlers nunca deben lanzar (Apple castiga crashes)
@@ -86,9 +87,9 @@ void _initializeHeavyServices() {
 /// Inicializa AdMob de forma asíncrona (fire and forget)
 void _initializeAdMob() {
   MobileAds.instance.initialize().then((_) {
-    print('✅ AdMob inicializado correctamente');
+    Logger.info('AdMob inicializado correctamente');
   }).catchError((e) {
-    print('⚠️ Error al inicializar AdMob: $e');
+    Logger.error('Error al inicializar AdMob', error: e);
   });
 }
 

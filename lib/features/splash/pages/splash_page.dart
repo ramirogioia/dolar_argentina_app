@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../settings/settings_service.dart';
 import '../../../services/version_checker.dart';
 import '../../../widgets/update_dialogs.dart';
+import '../../../app/router/app_router.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -40,27 +41,40 @@ class _SplashPageState extends State<SplashPage> {
       // Esperar un poco para que la UI se cargue
       await Future.delayed(const Duration(milliseconds: 500));
 
+      print('🔍 [SPLASH] Iniciando verificación de actualización...');
       final updateInfo = await VersionChecker.verificarActualizacion();
+
+      print(
+          '🔍 [SPLASH] updateInfo recibido: ${updateInfo != null ? "NO NULL" : "NULL"}');
+      if (updateInfo != null) {
+        print('🔍 [SPLASH] Tipo de actualización: ${updateInfo.type}');
+      }
 
       if (mounted && updateInfo != null) {
         if (updateInfo.type == UpdateType.force) {
+          print('🔍 [SPLASH] Mostrando FORCE UPDATE');
           // FORCE UPDATE: Bloquear la app
           setState(() {
             _forceUpdateBlocking = true;
           });
           mostrarDialogoForceUpdate(context, updateInfo);
         } else if (updateInfo.type == UpdateType.kind) {
+          print('🔍 [SPLASH] KIND UPDATE detectado, programando diálogo...');
           // KIND UPDATE: Mostrar opcionalmente (después de navegar)
-          // Esperar a que navegue primero
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (mounted) {
-              mostrarDialogoKindUpdate(context, updateInfo);
-            }
+          // Esperar a que navegue primero y usar navigatorKey para obtener contexto válido
+          Future.delayed(const Duration(milliseconds: 2000), () {
+            _mostrarDialogoKindUpdateConRetry(updateInfo, intento: 1);
           });
+        } else {
+          print(
+              '🔍 [SPLASH] No hay actualización necesaria (tipo: ${updateInfo.type})');
         }
+      } else {
+        print('⚠️ [SPLASH] updateInfo es null o widget no está montado');
       }
-    } catch (e) {
-      print('❌ Error verificando actualización: $e');
+    } catch (e, stackTrace) {
+      print('❌ [SPLASH] Error verificando actualización: $e');
+      print('❌ [SPLASH] Stack trace: $stackTrace');
       // En caso de error, NO bloquear la app
       // Continuar normalmente
     }
@@ -69,8 +83,49 @@ class _SplashPageState extends State<SplashPage> {
   void _navegarAlHome() {
     if (mounted && !_forceUpdateBlocking) {
       // Usar replace para que no se pueda volver al splash
-      context.go('/');
+      context.go('/home');
     }
+  }
+
+  void _mostrarDialogoKindUpdateConRetry(UpdateInfo updateInfo,
+      {int intento = 1}) {
+    print(
+        '🔍 [SPLASH] Intentando mostrar diálogo KIND UPDATE (intento $intento)...');
+
+    // Usar WidgetsBinding para asegurar que el contexto esté listo
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final contextValido = navigatorKey.currentContext;
+      print(
+          '🔍 [SPLASH] Contexto válido (intento $intento): ${contextValido != null ? "SÍ" : "NO"}');
+
+      if (contextValido != null) {
+        print('🔍 [SPLASH] Llamando a mostrarDialogoKindUpdate...');
+        try {
+          mostrarDialogoKindUpdate(contextValido, updateInfo);
+          print('✅ [SPLASH] Diálogo mostrado exitosamente');
+        } catch (e) {
+          print('❌ [SPLASH] Error al mostrar diálogo: $e');
+          if (intento < 3) {
+            Future.delayed(const Duration(milliseconds: 500), () {
+              _mostrarDialogoKindUpdateConRetry(updateInfo,
+                  intento: intento + 1);
+            });
+          }
+        }
+      } else {
+        print(
+            '⚠️ [SPLASH] No se pudo obtener contexto válido (intento $intento)');
+        if (intento < 5) {
+          // Intentar de nuevo con más tiempo
+          Future.delayed(const Duration(milliseconds: 500), () {
+            _mostrarDialogoKindUpdateConRetry(updateInfo, intento: intento + 1);
+          });
+        } else {
+          print(
+              '❌ [SPLASH] Máximo de intentos alcanzado, no se pudo mostrar el diálogo');
+        }
+      }
+    });
   }
 
   Future<void> _loadTheme() async {

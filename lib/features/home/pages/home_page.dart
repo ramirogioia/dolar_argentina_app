@@ -1,20 +1,75 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../domain/models/dollar_rate.dart';
 import '../../../domain/models/dollar_snapshot.dart';
+import '../../../services/version_checker.dart';
+import '../../../widgets/update_dialogs.dart';
 import '../../settings/providers/settings_providers.dart';
 import '../providers/dollar_providers.dart';
 import '../widgets/ad_banner.dart';
 import '../widgets/dollar_row.dart';
 import '../widgets/home_header.dart';
 
-class HomePage extends ConsumerWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends ConsumerState<HomePage> {
+  bool _updateChecked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Verificar actualización inmediatamente cuando se monta el HomePage
+    // Esto se ejecuta mientras el splash nativo todavía está visible
+    _verificarActualizacion();
+  }
+
+  Future<void> _verificarActualizacion() async {
+    if (_updateChecked) return; // Evitar múltiples verificaciones
+    _updateChecked = true;
+
+    try {
+      // Esperar un poco para que el splash nativo termine de mostrarse
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      print('🔍 [HOME] Iniciando verificación de actualización...');
+      final updateInfo = await VersionChecker.verificarActualizacion();
+
+      print('🔍 [HOME] updateInfo recibido: ${updateInfo != null ? "NO NULL" : "NULL"}');
+      if (updateInfo != null) {
+        print('🔍 [HOME] Tipo de actualización: ${updateInfo.type}');
+      }
+
+      if (mounted && updateInfo != null) {
+        if (updateInfo.type == UpdateType.force) {
+          print('🔍 [HOME] Mostrando FORCE UPDATE');
+          mostrarDialogoForceUpdate(context, updateInfo);
+        } else if (updateInfo.type == UpdateType.kind) {
+          print('🔍 [HOME] KIND UPDATE detectado, mostrando diálogo...');
+          // Esperar un poco más para que la UI esté lista
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted) {
+              mostrarDialogoKindUpdate(context, updateInfo);
+            }
+          });
+        }
+      }
+    } catch (e, stackTrace) {
+      print('❌ [HOME] Error verificando actualización: $e');
+      print('❌ [HOME] Stack trace: $stackTrace');
+      // En caso de error, NO bloquear la app
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final snapshotAsync = ref.watch(dollarSnapshotProvider);
 
     return Scaffold(

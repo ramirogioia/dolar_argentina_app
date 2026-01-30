@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -42,29 +42,53 @@ class VersionChecker {
       print('🔍 Verificando actualización. Versión actual: $versionActual');
 
       // 2. Consultar versión en el servidor
-      final url = versionUrl ?? _defaultVersionUrl;
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'DolarArgentinaApp/1.0',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-        },
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          throw Exception('Timeout al verificar versión');
-        },
-      );
+      // Agregar timestamp único para evitar caché completamente
+      final baseUrl = versionUrl ?? _defaultVersionUrl;
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final random = (timestamp % 1000000).toString();
+      final url = '$baseUrl?_t=$timestamp&_r=$random&_nocache=${DateTime.now().toIso8601String()}';
+      
+      print('🔍 URL de verificación: $url');
+      
+      // Crear cliente HTTP sin caché
+      final httpClient = HttpClient();
+      httpClient.autoUncompress = true;
+      final client = IOClient(httpClient);
+      
+      try {
+        final response = await client.get(
+          Uri.parse(url),
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'DolarArgentinaApp/1.0',
+            'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'If-Modified-Since': '0',
+            'If-None-Match': '*',
+          },
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Timeout al verificar versión');
+          },
+        );
 
-      if (response.statusCode == 200) {
+        if (response.statusCode == 200) {
+        print('🔍 Respuesta del servidor recibida (${response.body.length} bytes)');
+        print('🔍 Body completo: ${response.body}');
+        
         final versionData = json.decode(response.body) as Map<String, dynamic>;
 
         final versionServidor = versionData['version'] as String;
         final versionMinima = versionData['version_minima'] as String;
         final requiereActualizacion =
             versionData['requiere_actualizacion'] as bool? ?? false;
+        
+        print('🔍 Valores parseados del JSON:');
+        print('   - version: $versionServidor');
+        print('   - version_minima: $versionMinima');
+        print('   - requiere_actualizacion: $requiereActualizacion (tipo: ${requiereActualizacion.runtimeType})');
         final notas = (versionData['notas_actualizacion'] as List?)
                 ?.map((e) => e.toString())
                 .toList() ??
@@ -84,11 +108,21 @@ class VersionChecker {
 
         print(
             '🔍 Comparación mínima: $comparacionMinima, servidor: $comparacionServidor');
+        print('🔍 Versión actual app: $versionActual');
+        print('🔍 Versión mínima requerida: $versionMinima');
+        print('🔍 Requiere actualización (flag): $requiereActualizacion');
 
         // 4. Determinar tipo de actualización
 
         // FORCE UPDATE: Si está por debajo de version_minima O requiere_actualizacion es true
-        if (comparacionMinima < 0 || requiereActualizacion) {
+        final esForcePorVersion = comparacionMinima < 0;
+        final esForcePorFlag = requiereActualizacion;
+        
+        print('🔍 FORCE UPDATE check:');
+        print('   - Por versión (actual < mínima): $esForcePorVersion (comparación: $comparacionMinima)');
+        print('   - Por flag (requiere_actualizacion): $esForcePorFlag');
+        
+        if (esForcePorVersion || esForcePorFlag) {
           print('⚠️ FORCE UPDATE requerido');
           return UpdateInfo(
             type: UpdateType.force,
@@ -113,18 +147,22 @@ class VersionChecker {
           );
         }
 
-        // NO HAY ACTUALIZACIÓN
-        print('✅ App actualizada');
-        return UpdateInfo(
-          type: UpdateType.none,
-          version: versionServidor,
-          versionMinima: versionMinima,
-          notas: notas,
-          urlAndroid: urlAndroid,
-          urlIos: urlIos,
-        );
-      } else {
-        print('⚠️ Error al verificar versión: Status ${response.statusCode}');
+          // NO HAY ACTUALIZACIÓN
+          print('✅ App actualizada');
+          return UpdateInfo(
+            type: UpdateType.none,
+            version: versionServidor,
+            versionMinima: versionMinima,
+            notas: notas,
+            urlAndroid: urlAndroid,
+            urlIos: urlIos,
+          );
+        } else {
+          print('⚠️ Error al verificar versión: Status ${response.statusCode}');
+        }
+      } finally {
+        client.close();
+        httpClient.close();
       }
     } catch (e) {
       print('❌ Error verificando versión: $e');

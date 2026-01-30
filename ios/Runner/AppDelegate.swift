@@ -9,9 +9,8 @@ import FirebaseMessaging
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    // Firebase DEBE configurarse aquí primero. Si no, cuando llegue el token APNs
-    // Messaging aún no está listo y FCM nunca recibe el token → no llegan notificaciones en iOS.
-    FirebaseApp.configure()
+    // No llamar FirebaseApp.configure() aquí: Flutter lo hace desde Dart (Firebase.initializeApp).
+    // Llamarlo aquí causaba crash al abrir en algunos dispositivos/versiones.
     GeneratedPluginRegistrant.register(with: self)
     if #available(iOS 10.0, *) {
       application.registerForRemoteNotifications()
@@ -20,10 +19,13 @@ import FirebaseMessaging
   }
 
   // Pasar el token APNs a Firebase. Sin esto, FCM no puede entregar notificaciones en iOS.
+  // Solo asignar si Firebase ya está configurado (p. ej. por Flutter); si no, evitar crash.
   override func application(
     _ application: UIApplication,
     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
   ) {
-    Messaging.messaging().apnsToken = deviceToken
+    if FirebaseApp.app() != nil {
+      Messaging.messaging().apnsToken = deviceToken
+    }
   }
 }

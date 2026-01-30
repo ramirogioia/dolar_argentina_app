@@ -18,7 +18,7 @@ class _SplashPageState extends State<SplashPage> {
   void initState() {
     super.initState();
     _loadTheme();
-    // Ocultar el splash nativo inmediatamente para que solo se vea este (el grande)
+    // Mismo que main: edgeToEdge para que las capturas tengan barra de estado (App Store)
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
     // Esperar exactamente 2 segundos antes de navegar al home

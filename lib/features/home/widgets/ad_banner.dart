@@ -135,7 +135,7 @@ class _AdBannerState extends State<AdBanner> {
           border: Border.all(
             color: Theme.of(context).brightness == Brightness.dark
                 ? const Color(0xFF3C3C3C)
-                : Colors.grey[300]!,
+                : (Colors.grey[300] ?? const Color(0xFFE0E0E0)),
           ),
         ),
         child: Center(

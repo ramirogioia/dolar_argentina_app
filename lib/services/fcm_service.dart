@@ -284,10 +284,10 @@ class FCMService {
     print('📨 Usuario tocó notificación local');
     print('   Payload: ${response.payload}');
 
-    // Navegar a home cuando se toca la notificación local
-    if (_navigatorKey?.currentContext != null) {
-      final context = _navigatorKey!.currentContext!;
-      context.go('/');
+    // Navegar a home cuando se toca la notificación local (evitar crash si context ya no está montado)
+    final ctx = _navigatorKey?.currentContext;
+    if (ctx != null && ctx.mounted) {
+      ctx.go('/');
       print('✅ Navegado a home desde notificación local');
     } else {
       print('⚠️ NavigatorKey no disponible para navegación local');
@@ -303,28 +303,24 @@ class FCMService {
   static void _handleNotificationTap(RemoteMessage message) {
     final tipo = message.data['tipo'] as String?;
 
-    if (_navigatorKey?.currentContext == null) {
+    final ctx = _navigatorKey?.currentContext;
+    if (ctx == null || !ctx.mounted) {
       print('⚠️ NavigatorKey no disponible, intentando navegar más tarde...');
-      // Reintentar después de un delay
       Future.delayed(const Duration(seconds: 2), () {
         _handleNotificationTap(message);
       });
       return;
     }
 
-    final context = _navigatorKey!.currentContext!;
-
     print('🧭 Navegando según tipo: $tipo');
 
     // Ambos tipos navegan a home (donde se muestra el dólar blue por defecto)
     if (tipo == 'apertura' || tipo == 'cierre') {
-      // Navegar a home (ruta '/')
-      context.go('/');
+      ctx.go('/');
       print('✅ Navegado a home');
     } else {
-      // Tipo desconocido, navegar a home por defecto
       print('⚠️ Tipo desconocido: $tipo, navegando a home');
-      context.go('/');
+      ctx.go('/');
     }
   }
 

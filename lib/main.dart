@@ -12,31 +12,43 @@ import 'app/theme/app_theme.dart';
 import 'features/settings/providers/settings_providers.dart';
 import 'services/fcm_service.dart';
 
+/// True si Firebase se inicializó correctamente (evita crashes al usar Crashlytics/FCM).
+bool _firebaseInitialized = false;
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Con barra de estado visible las capturas se aceptan en App Store (como Impostor).
+  // Para pantalla limpia de nuevo: cambiar a SystemUiMode.immersiveSticky.
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
   // Inicializar Firebase (debe ser antes de cualquier otro servicio de Firebase)
   try {
     await Firebase.initializeApp();
+    _firebaseInitialized = true;
     print('✅ Firebase inicializado correctamente');
   } catch (e) {
     print('❌ Error al inicializar Firebase: $e');
     print('⚠️ Verifica que los archivos google-services.json (Android) y GoogleService-Info.plist (iOS) estén presentes');
   }
 
-  // Crashlytics: habilitar y capturar crashes (solo si Firebase está inicializado)
-  try {
-    FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
-    FlutterError.onError = (details) {
-      FirebaseCrashlytics.instance.recordFlutterFatalError(details);
-    };
-    PlatformDispatcher.instance.onError = (error, stack) {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-      return true;
-    };
-  } catch (_) {}
+  // Crashlytics: solo si Firebase está listo; handlers nunca deben lanzar (Apple castiga crashes)
+  if (_firebaseInitialized) {
+    try {
+      FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
+      FlutterError.onError = (details) {
+        try {
+          FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+        } catch (_) {}
+      };
+      PlatformDispatcher.instance.onError = (error, stack) {
+        try {
+          FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+        } catch (_) {}
+        return true;
+      };
+    } catch (_) {}
+  }
 
   runZonedGuarded<Future<void>>(() async {
     runApp(
@@ -46,7 +58,9 @@ void main() async {
     );
   }, (error, stack) {
     try {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      if (_firebaseInitialized) {
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      }
     } catch (_) {}
   });
 
@@ -79,11 +93,12 @@ void _initializeAdMob() {
   });
 }
 
-/// Inicializa FCM de forma asíncrona (fire and forget)
+/// Inicializa FCM de forma asíncrona (fire and forget).
+/// Solo se ejecuta si Firebase inicializó bien; si no, evitaríamos crash al tocar Messaging.
 void _initializeFCM() {
+  if (!_firebaseInitialized) return;
   SharedPreferences.getInstance().then((prefs) {
     final notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
-    
     FCMService.initialize(
       navigatorKey: navigatorKey,
       autoSubscribe: notificationsEnabled,

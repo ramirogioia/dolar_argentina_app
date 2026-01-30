@@ -127,6 +127,18 @@ Map<Bank, DollarRate> get _emptyBankRates => {
 final selectedBankProvider =
     StateProvider<Bank>((ref) => Bank.nacion);
 
+/// Bancos que scrapea el backend (dolar_oficial). Solo estos se muestran en el dropdown.
+const List<Bank> officialBanksFromBackend = [
+  Bank.nacion,
+  Bank.bbva,
+  Bank.supervielle,
+  Bank.patagonia,
+  Bank.provincia,
+  Bank.ciudad,
+  Bank.hipotecario,
+  Bank.icbc,
+];
+
 // Valores para cada banco (desde backend)
 final bankRatesProvider = Provider<Map<Bank, DollarRate>>((ref) {
   final jsonDataAsync = ref.watch(fullJsonDataProvider);

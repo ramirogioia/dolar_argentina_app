@@ -66,12 +66,14 @@ class _HomeHeaderState extends State<HomeHeader> {
     }
   }
 
+  /// Formatea la fecha/hora en zona Argentina (UTC-3), como la envía el backend.
   static String _formatLastMeasurement(DateTime d) {
-    final y = d.year;
-    final m = d.month.toString().padLeft(2, '0');
-    final day = d.day.toString().padLeft(2, '0');
-    final h = d.hour.toString().padLeft(2, '0');
-    final min = d.minute.toString().padLeft(2, '0');
+    final arg = d.toUtc().subtract(const Duration(hours: 3));
+    final y = arg.year;
+    final m = arg.month.toString().padLeft(2, '0');
+    final day = arg.day.toString().padLeft(2, '0');
+    final h = arg.hour.toString().padLeft(2, '0');
+    final min = arg.minute.toString().padLeft(2, '0');
     return '$y-$m-$day $h:$min';
   }
 

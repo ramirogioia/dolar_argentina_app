@@ -1,7 +1,6 @@
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
@@ -46,11 +45,12 @@ dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }
 
-// Aplicar Google Services plugin solo si existe google-services.json
+// Aplicar Google Services y Crashlytics solo si existe google-services.json
 val googleServicesFile = file("google-services.json")
 if (googleServicesFile.exists()) {
     apply(plugin = "com.google.gms.google-services")
-    println("✅ google-services.json encontrado, aplicando plugin de Google Services")
+    apply(plugin = "com.google.firebase.crashlytics")
+    println("✅ google-services.json encontrado, aplicando plugins de Firebase")
 } else {
     println("⚠️ google-services.json no encontrado. Firebase no funcionará en Android hasta que agregues el archivo.")
     println("   Descarga el archivo desde Firebase Console y colócalo en android/app/google-services.json")

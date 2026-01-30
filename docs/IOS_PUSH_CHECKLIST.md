@@ -20,7 +20,11 @@ Sin esto, FCM **no puede** entregar a ningún iPhone.
 
 ---
 
-## 2. Capacidad Push en Xcode
+## 2. Token APNs pasado a Firebase (AppDelegate)
+
+En `ios/Runner/AppDelegate.swift` la app debe pasar el token APNs a Firebase en `didRegisterForRemoteNotificationsWithDeviceToken` (asignar `Messaging.messaging().apnsToken = deviceToken`). Sin esto, FCM no puede entregar en iOS. Ya está implementado en el proyecto.
+
+## 3. Capacidad Push en Xcode
 
 La app tiene que tener la capacidad **Push Notifications** y **Background Modes → Remote notifications**.
 
@@ -34,14 +38,14 @@ La app tiene que tener la capacidad **Push Notifications** y **Background Modes 
 
 ---
 
-## 3. Comprobar en el iPhone (TestFlight)
+## 4. Comprobar en el iPhone (TestFlight)
 
 - Que **Notificaciones** estén permitidas para **Dólar Argentina** (Ajustes → Notificaciones).
 - Que la app se haya abierto al menos una vez después de instalar desde TestFlight (para que se registre el token FCM y la suscripción al topic).
 
 ---
 
-## 4. Resumen
+## 5. Resumen
 
 | Revisión              | Dónde                          |
 |-----------------------|---------------------------------|

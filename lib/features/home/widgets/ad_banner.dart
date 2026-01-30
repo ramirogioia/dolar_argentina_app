@@ -31,7 +31,7 @@ class _AdBannerState extends State<AdBanner> {
 
     _bannerAd = BannerAd(
       adUnitId: adUnitId,
-      size: AdSize.largeBanner,
+      size: AdSize.largeBanner, // 320x100: más facturación, sin comer mucho scroll
       request: const AdRequest(),
       listener: BannerAdListener(
         onAdLoaded: (_) {
@@ -100,8 +100,8 @@ class _AdBannerState extends State<AdBanner> {
     // Si hay error, mostrar mensaje
     if (_errorMessage != null) {
       return Container(
-        margin: const EdgeInsets.all(16),
-        height: 100, // Altura de Large Banner (320x100)
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        height: 100, // Mismo alto que Large Banner (320x100)
         decoration: BoxDecoration(
           color: Theme.of(context).brightness == Brightness.dark
               ? const Color(0xFF2C2C2C)
@@ -125,8 +125,8 @@ class _AdBannerState extends State<AdBanner> {
     // Si no está cargado, mostrar placeholder
     if (!_isAdLoaded || _bannerAd == null) {
       return Container(
-        margin: const EdgeInsets.all(16),
-        height: 100, // Altura de Large Banner (320x100)
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        height: 100, // Mismo alto que Large Banner (320x100)
         decoration: BoxDecoration(
           color: Theme.of(context).brightness == Brightness.dark
               ? const Color(0xFF2C2C2C)
@@ -152,10 +152,9 @@ class _AdBannerState extends State<AdBanner> {
       );
     }
 
-    // El banner de AdMob Large Banner tiene un tamaño de 320x100
-    // Usamos SizedBox con altura fija para evitar problemas de layout infinito
+    // Large Banner = 320x100
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       width: double.infinity,
       height: _bannerAd!.size.height.toDouble(),
       alignment: Alignment.center,

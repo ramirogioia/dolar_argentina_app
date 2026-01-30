@@ -38,7 +38,11 @@ class DollarRow extends ConsumerWidget {
     } else if (rate.type == DollarType.official) {
       final bankRates = ref.watch(bankRatesProvider);
       final selectedBank = ref.watch(selectedBankProvider);
-      displayRate = bankRates[selectedBank] ?? rate;
+      final availableBanks = officialBanksFromBackend;
+      final effectiveBank = availableBanks.contains(selectedBank)
+          ? selectedBank
+          : availableBanks.first;
+      displayRate = bankRates[effectiveBank] ?? rate;
       // Si el rate del provider no tiene changePercent pero el rate original sí,
       // y son del mismo banco, mantener el changePercent del original
       if (displayRate.changePercent == null && rate.changePercent != null) {
@@ -333,6 +337,10 @@ class DollarRow extends ConsumerWidget {
 
   Widget _buildBankDropdown(BuildContext context, WidgetRef ref) {
     final selectedBank = ref.watch(selectedBankProvider);
+    final availableBanks = officialBanksFromBackend;
+    final effectiveBank = availableBanks.contains(selectedBank)
+        ? selectedBank
+        : availableBanks.first;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SizedBox(
@@ -354,7 +362,7 @@ class DollarRow extends ConsumerWidget {
         ),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<Bank>(
-            value: selectedBank,
+            value: effectiveBank,
             isDense: true,
             isExpanded: true,
             icon: Icon(
@@ -372,7 +380,7 @@ class DollarRow extends ConsumerWidget {
               letterSpacing: 0.1,
             ),
             selectedItemBuilder: (BuildContext context) {
-              return Bank.values.map((bank) {
+              return availableBanks.map((bank) {
                 return Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -389,7 +397,7 @@ class DollarRow extends ConsumerWidget {
                 );
               }).toList();
             },
-            items: Bank.values.map((bank) {
+            items: availableBanks.map((bank) {
               return DropdownMenuItem<Bank>(
                 value: bank,
                 child: Row(

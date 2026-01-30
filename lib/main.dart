@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app/router/app_router.dart';
 import 'app/theme/app_theme.dart';
@@ -15,25 +18,39 @@ void main() async {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
   // Inicializar Firebase (debe ser antes de cualquier otro servicio de Firebase)
-  // Esto es rápido y necesario antes de runApp()
   try {
     await Firebase.initializeApp();
     print('✅ Firebase inicializado correctamente');
   } catch (e) {
     print('❌ Error al inicializar Firebase: $e');
     print('⚠️ Verifica que los archivos google-services.json (Android) y GoogleService-Info.plist (iOS) estén presentes');
-    // Continuar aunque falle Firebase para que la app arranque
   }
 
-  // Lanzar la app INMEDIATAMENTE (no esperar AdMob ni FCM)
-  runApp(
-    const ProviderScope(
-      child: DolarArgentinaApp(),
-    ),
-  );
+  // Crashlytics: habilitar y capturar crashes (solo si Firebase está inicializado)
+  try {
+    FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
+    FlutterError.onError = (details) {
+      FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+    };
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
+  } catch (_) {}
+
+  runZonedGuarded<Future<void>>(() async {
+    runApp(
+      const ProviderScope(
+        child: DolarArgentinaApp(),
+      ),
+    );
+  }, (error, stack) {
+    try {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    } catch (_) {}
+  });
 
   // Inicializar servicios pesados DESPUÉS de que la app arranque (en background)
-  // Esto evita que el splash screen se quede mucho tiempo
   _initializeHeavyServices();
 }
 

@@ -241,10 +241,10 @@ class HomePage extends ConsumerWidget {
                   ],
                 ),
               ),
-              // Espacio para el banner fijo: altura banner + gap mínimo para que la leyenda no quede tapada
+              // Espacio para el banner fijo (Large Banner 100px + márgenes): leyenda visible sin tapar
               SliverToBoxAdapter(
                 child: SizedBox(
-                  height: 115,
+                  height: 122,
                 ),
               ),
             ],
@@ -258,9 +258,9 @@ class HomePage extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Espacio celeste visible entre la última tarjeta y el banner
+              // Pequeño espacio entre contenido y banner
               Container(
-                height: 16,
+                height: 8,
                 color: Theme.of(context).scaffoldBackgroundColor,
               ),
               // Banner de publicidad

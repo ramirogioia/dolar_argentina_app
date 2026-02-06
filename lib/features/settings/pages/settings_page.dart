@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/settings_providers.dart';
 import '../../../services/fcm_service.dart';
@@ -13,6 +14,9 @@ class SettingsPage extends ConsumerStatefulWidget {
 }
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
+  /// Mostrar sección "Debug: Notificaciones" en Ajustes. Cambiar a true para volver a usarla.
+  static const bool _showDebugNotifications = false;
+
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
@@ -50,8 +54,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               value: ref.watch(notificationsEnabledProvider),
               onChanged: (value) async {
                 // Actualizar el estado primero para que la UI responda inmediatamente
-                await ref.read(notificationsEnabledProvider.notifier).setEnabled(value);
-                
+                await ref
+                    .read(notificationsEnabledProvider.notifier)
+                    .setEnabled(value);
+
                 // Suscribir o desuscribir del topic según el estado (en background)
                 // No esperar para que la UI no se bloquee
                 if (value) {
@@ -133,6 +139,27 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
           const SizedBox(height: 16),
           Card(
+            child: ListTile(
+              leading: Icon(
+                Icons.email,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              title: Text(
+                'Contacto y Publicidad',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              subtitle: const Text(
+                'Por cualquier consulta o tema de publicidad podés escribirnos por correo',
+                style: TextStyle(fontSize: 12),
+              ),
+              trailing: const Icon(Icons.open_in_new, size: 20),
+              onTap: () => _openContactEmail(context),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
             child: ExpansionTile(
               leading: Icon(
                 Icons.info_outline,
@@ -153,34 +180,34 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       _buildInfoSection(
                         context,
                         'Funcionalidad',
-                        'Esta app te permite consultar en tiempo real los diferentes tipos de cotización del dólar en Argentina. Los datos se actualizan automáticamente desde fuentes oficiales y plataformas verificadas.',
+                        'Consultá en tiempo real las cotizaciones del dólar en Argentina: blue, oficial, cripto, tarjeta, MEP y CCL. Los valores se actualizan automáticamente para que siempre tengas la información al día.',
                         Icons.currency_exchange,
                       ),
                       const SizedBox(height: 16),
                       _buildInfoSection(
                         context,
-                        'Marcadores de Variación',
-                        'Los indicadores de variación muestran cómo cambió el precio respecto a hace 24 horas:\n\n'
-                            '• Verde ↗️: El precio subió (variación positiva)\n'
-                            '• Rojo ↘️: El precio bajó (variación negativa)\n'
-                            '• Gris ➖: Sin variación significativa (0.00%)',
+                        'Marcadores de variación',
+                        'Cada tipo de dólar muestra cómo varió el precio respecto a las últimas 24 horas:\n\n'
+                            '• Verde ↗️: subió\n'
+                            '• Rojo ↘️: bajó\n'
+                            '• Gris ➖: sin cambio significativo',
                         Icons.trending_up,
                       ),
                       const SizedBox(height: 16),
                       _buildInfoSection(
                         context,
-                        'Opciones Disponibles',
-                        '• Dólar Oficial: Selecciona diferentes bancos para comparar cotizaciones\n'
-                            '• Dólar Cripto: Elige entre plataformas P2P (Binance, KuCoin, OKX, Bitget)\n'
-                            '• Personalización: Reordena y oculta tipos de dólar según tus preferencias\n'
-                            '• Actualización manual: Desliza hacia abajo para refrescar los datos',
+                        'Opciones disponibles',
+                        '• Dólar Oficial: elegí el banco para ver su cotización (Nación, BBVA, Provincia, etc.)\n'
+                            '• Dólar Cripto: elegí la plataforma P2P (Binance, KuCoin, Bybit, OKX, Bitget)\n'
+                            '• Personalización: reordená y ocultá tipos de dólar en Ajustes\n'
+                            '• Actualización: deslizá hacia abajo en la pantalla principal para refrescar',
                         Icons.settings_applications,
                       ),
                       const SizedBox(height: 16),
                       _buildInfoSection(
                         context,
-                        'Fuentes de Datos',
-                        'Los datos provienen directamente de las entidades oficiales y se actualizan periódicamente. La información se obtiene desde el repositorio GitHub del backend y refleja las cotizaciones más recientes del mercado.',
+                        'Fuentes de datos',
+                        'Las cotizaciones provienen directamente de las fuentes oficiales (bancos, entidades y plataformas verificadas). La información se actualiza de forma recurrente para que los valores mostrados reflejen el mercado real.',
                         Icons.cloud_download,
                       ),
                     ],
@@ -190,170 +217,184 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
           ),
           const SizedBox(height: 16),
-          // Sección de debugging de notificaciones (solo en modo debug)
-          Card(
-            color: Colors.orange.shade50,
-            child: ExpansionTile(
-              leading: Icon(
-                Icons.bug_report,
-                color: Colors.orange.shade700,
-              ),
-              title: Text(
-                'Debug: Notificaciones',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.orange.shade700,
-                    ),
-              ),
-              subtitle: const Text(
-                'Herramientas para diagnosticar problemas de notificaciones',
-                style: TextStyle(fontSize: 12),
-              ),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      FutureBuilder<String?>(
-                        future: FCMService.getToken(),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState == ConnectionState.waiting) {
-                            return const CircularProgressIndicator();
-                          }
-                          
-                          final token = snapshot.data;
-                          
-                          if (token == null || token.isEmpty) {
+          // Sección de debugging de notificaciones (oculta; poner _showDebugNotifications = true para mostrarla)
+          if (_showDebugNotifications) ...[
+            Card(
+              color: Colors.orange.shade50,
+              child: ExpansionTile(
+                leading: Icon(
+                  Icons.bug_report,
+                  color: Colors.orange.shade700,
+                ),
+                title: Text(
+                  'Debug: Notificaciones',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange.shade700,
+                      ),
+                ),
+                subtitle: const Text(
+                  'Herramientas para diagnosticar problemas de notificaciones',
+                  style: TextStyle(fontSize: 12),
+                ),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        FutureBuilder<String?>(
+                          future: FCMService.getToken(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const CircularProgressIndicator();
+                            }
+
+                            final token = snapshot.data;
+
+                            if (token == null || token.isEmpty) {
+                              return Column(
+                                children: [
+                                  const Text(
+                                    '❌ Token FCM no disponible',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: () async {
+                                      await FCMService.initialize();
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                                'Reinicializando FCM... Revisa los logs'),
+                                          ),
+                                        );
+                                      }
+                                      setState(() {});
+                                    },
+                                    icon: const Icon(Icons.refresh),
+                                    label: const Text('Reinicializar FCM'),
+                                  ),
+                                ],
+                              );
+                            }
+
                             return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 const Text(
-                                  '❌ Token FCM no disponible',
-                                  style: TextStyle(color: Colors.red),
+                                  '✅ Token FCM disponible',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade200,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: SelectableText(
+                                    token,
+                                    style: const TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: () {
+                                          Clipboard.setData(
+                                              ClipboardData(text: token));
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                  '✅ Token copiado al portapapeles'),
+                                              duration: Duration(seconds: 2),
+                                            ),
+                                          );
+                                        },
+                                        icon: const Icon(Icons.copy),
+                                        label: const Text('Copiar Token'),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: () async {
+                                          try {
+                                            await FCMService.subscribeToTopic();
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                      '✅ Suscrito al topic "all_users"'),
+                                                  backgroundColor: Colors.green,
+                                                ),
+                                              );
+                                            }
+                                          } catch (e) {
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                  content: Text('❌ Error: $e'),
+                                                  backgroundColor: Colors.red,
+                                                ),
+                                              );
+                                            }
+                                          }
+                                        },
+                                        icon: const Icon(
+                                            Icons.notifications_active),
+                                        label: const Text('Suscribir'),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 const SizedBox(height: 8),
                                 ElevatedButton.icon(
-                                  onPressed: () async {
-                                    await FCMService.initialize();
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Reinicializando FCM... Revisa los logs'),
-                                        ),
-                                      );
-                                    }
-                                    setState(() {});
+                                  onPressed: () {
+                                    FCMService.diagnosticar();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                            '🔍 Revisa los logs de la consola'),
+                                        duration: Duration(seconds: 3),
+                                      ),
+                                    );
                                   },
-                                  icon: const Icon(Icons.refresh),
-                                  label: const Text('Reinicializar FCM'),
+                                  icon: const Icon(Icons.medical_services),
+                                  label: const Text(
+                                      'Ejecutar Diagnóstico Completo'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                    foregroundColor: Colors.white,
+                                  ),
                                 ),
                               ],
                             );
-                          }
-                          
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              const Text(
-                                '✅ Token FCM disponible',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.green,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade200,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: SelectableText(
-                                  token,
-                                  style: const TextStyle(
-                                    fontFamily: 'monospace',
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: ElevatedButton.icon(
-                                      onPressed: () {
-                                        Clipboard.setData(ClipboardData(text: token));
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('✅ Token copiado al portapapeles'),
-                                            duration: Duration(seconds: 2),
-                                          ),
-                                        );
-                                      },
-                                      icon: const Icon(Icons.copy),
-                                      label: const Text('Copiar Token'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: ElevatedButton.icon(
-                                      onPressed: () async {
-                                        try {
-                                          await FCMService.subscribeToTopic();
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('✅ Suscrito al topic "all_users"'),
-                                                backgroundColor: Colors.green,
-                                              ),
-                                            );
-                                          }
-                                        } catch (e) {
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(
-                                                content: Text('❌ Error: $e'),
-                                                backgroundColor: Colors.red,
-                                              ),
-                                            );
-                                          }
-                                        }
-                                      },
-                                      icon: const Icon(Icons.notifications_active),
-                                      label: const Text('Suscribir'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  FCMService.diagnosticar();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('🔍 Revisa los logs de la consola'),
-                                      duration: Duration(seconds: 3),
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(Icons.medical_services),
-                                label: const Text('Ejecutar Diagnóstico Completo'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue,
-                                  foregroundColor: Colors.white,
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ],
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
+          ],
           Card(
             child: ExpansionTile(
               leading: Icon(
@@ -380,14 +421,43 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         context,
                         'Dólar Oficial',
                         [
-                          {'nombre': 'Banco Nación', 'url': 'https://www.bna.com.ar/Personas'},
-                          {'nombre': 'BBVA Argentina', 'url': 'https://www.bbva.com.ar/personas/productos/inversiones/cotizacion-moneda-extranjera.html'},
-                          {'nombre': 'Banco Supervielle', 'url': 'https://www.supervielle.com.ar/personas/inversiones/moneda-extranjera/compra-y-venta'},
-                          {'nombre': 'Banco Patagonia', 'url': 'https://ebankpersonas.bancopatagonia.com.ar/eBanking/usuarios/cotizacionMonedaExtranjera.htm'},
-                          {'nombre': 'Banco Provincia', 'url': 'https://www.bancoprovincia.com.ar/productos/inversiones/dolares_bip/dolares_bip_info_gral'},
-                          {'nombre': 'Banco Ciudad', 'url': 'https://bancociudad.com.ar/institucional/'},
-                          {'nombre': 'Banco Hipotecario', 'url': 'https://www.hipotecario.com.ar/buho-one/inversiones/cotizaciones/'},
-                          {'nombre': 'ICBC Argentina', 'url': 'https://www.icbc.com.ar/personas/start'},
+                          {
+                            'nombre': 'Banco Nación',
+                            'url': 'https://www.bna.com.ar/Personas'
+                          },
+                          {
+                            'nombre': 'BBVA Argentina',
+                            'url':
+                                'https://www.bbva.com.ar/personas/productos/inversiones/cotizacion-moneda-extranjera.html'
+                          },
+                          {
+                            'nombre': 'Banco Supervielle',
+                            'url':
+                                'https://www.supervielle.com.ar/personas/inversiones/moneda-extranjera/compra-y-venta'
+                          },
+                          {
+                            'nombre': 'Banco Patagonia',
+                            'url':
+                                'https://ebankpersonas.bancopatagonia.com.ar/eBanking/usuarios/cotizacionMonedaExtranjera.htm'
+                          },
+                          {
+                            'nombre': 'Banco Provincia',
+                            'url':
+                                'https://www.bancoprovincia.com.ar/productos/inversiones/dolares_bip/dolares_bip_info_gral'
+                          },
+                          {
+                            'nombre': 'Banco Ciudad',
+                            'url': 'https://bancociudad.com.ar/institucional/'
+                          },
+                          {
+                            'nombre': 'Banco Hipotecario',
+                            'url':
+                                'https://www.hipotecario.com.ar/buho-one/inversiones/cotizaciones/'
+                          },
+                          {
+                            'nombre': 'ICBC Argentina',
+                            'url': 'https://www.icbc.com.ar/personas/start'
+                          },
                         ],
                         Icons.account_balance,
                       ),
@@ -396,7 +466,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         context,
                         'Dólar Cripto',
                         [
-                          {'nombre': 'Binance', 'url': 'https://p2p.binance.com'},
+                          {
+                            'nombre': 'Binance',
+                            'url': 'https://p2p.binance.com'
+                          },
                           {'nombre': 'KuCoin', 'url': 'https://www.kucoin.com'},
                           {'nombre': 'Bybit', 'url': 'https://www.bybit.com'},
                           {'nombre': 'OKX', 'url': 'https://www.okx.com'},
@@ -410,9 +483,63 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ],
             ),
           ),
+          const SizedBox(height: 24),
+          FutureBuilder<PackageInfo>(
+            future: PackageInfo.fromPlatform(),
+            builder: (context, snapshot) {
+              final version = snapshot.data?.version ?? '1.0.0';
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Center(
+                  child: Text(
+                    'v$version',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.6),
+                        ),
+                  ),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );
+  }
+
+  static const String _contactEmail = 'info@giftera-store.com';
+
+  Future<void> _openContactEmail(BuildContext context) async {
+    const subject = 'Contacto desde Dólar Argentina';
+    const body = 'Hola,\n\nLes escribo desde la app Dólar Argentina.\n\n'
+        '[Escriba aquí su consulta o tema de interés]\n\n'
+        'Saludos cordiales,';
+    // Codificar con %20 para espacios (algunos clientes muestran + literal si usamos queryParameters)
+    final query =
+        'subject=${Uri.encodeComponent(subject)}&body=${Uri.encodeComponent(body)}';
+    final uri = Uri.parse('mailto:$_contactEmail?$query');
+
+    bool opened = false;
+    try {
+      if (await canLaunchUrl(uri)) {
+        opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      opened = false;
+    }
+
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'No se pudo abrir el correo. Asegurate de tener una app de correo instalada (Gmail, Outlook, etc.). Podés escribir a $_contactEmail',
+          ),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   Widget _buildInfoSection(
@@ -492,7 +619,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('No se pudo abrir el enlace: ${source['url']}'),
+                        content: Text(
+                            'No se pudo abrir el enlace: ${source['url']}'),
                       ),
                     );
                   }

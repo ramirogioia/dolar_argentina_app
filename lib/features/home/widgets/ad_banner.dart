@@ -6,7 +6,10 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 /// Widget para mostrar un banner de AdMob
 class AdBanner extends StatefulWidget {
-  const AdBanner({super.key});
+  /// Ad Unit ID personalizado (opcional). Si no se provee, usa el ID por defecto.
+  final String? customAdUnitId;
+  
+  const AdBanner({super.key, this.customAdUnitId});
 
   @override
   State<AdBanner> createState() => _AdBannerState();
@@ -42,9 +45,10 @@ class _AdBannerState extends State<AdBanner> {
   }
 
   void _loadBannerAdWithContext(BuildContext context) {
+    final newSize = _getAdSize(context);
+
     if (_bannerAd != null && _isAdLoaded) {
       // Si ya hay un banner cargado y el tamaño es correcto, no recargar
-      final newSize = _getAdSize(context);
       if (_currentAdSize == newSize) {
         return;
       }
@@ -53,7 +57,16 @@ class _AdBannerState extends State<AdBanner> {
       _bannerAd = null;
       _isAdLoaded = false;
     }
-    
+
+    // Si ya hay una carga en curso, no reiniciar (evita resetear el timeout en cada rebuild)
+    if (_bannerAd != null && !_isAdLoaded && _errorMessage == null) {
+      return;
+    }
+    // Si ya falló o dio timeout, no reiniciar en cada rebuild (en TestFlight/Release el fill puede ser bajo)
+    if (_errorMessage != null) {
+      return;
+    }
+
     _errorMessage = null;
     _isAdLoaded = false;
     final adUnitId = _getAdUnitId();
@@ -102,12 +115,18 @@ class _AdBannerState extends State<AdBanner> {
   }
 
   String _getAdUnitId() {
+    // Si se provee un customAdUnitId, usarlo (solo en release mode)
+    if (widget.customAdUnitId != null && kReleaseMode) {
+      return widget.customAdUnitId!;
+    }
+    
     // Debug = test IDs. Release (TestFlight, App Store) = IDs reales de producción.
     const testIos = 'ca-app-pub-3940256099942544/2934735716';
     const testAndroid = 'ca-app-pub-3940256099942544/6300978111';
     const realIos = 'ca-app-pub-6119092953994163/2879928015';
     // Crear unidad "Banner" para la app Android en AdMob y reemplazar el número por el ID que te den:
-    const realAndroid = 'ca-app-pub-6119092953994163/2879928015'; // Reemplazar /2879928015 por tu Android banner unit ID
+    const realAndroid =
+        'ca-app-pub-6119092953994163/2879928015'; // Reemplazar /2879928015 por tu Android banner unit ID
 
     final useReal = kReleaseMode;
     if (Platform.isAndroid) {
@@ -130,11 +149,11 @@ class _AdBannerState extends State<AdBanner> {
   Widget build(BuildContext context) {
     // Cargar el banner en el primer build o si cambió el tamaño
     _loadBannerAdWithContext(context);
-    
+
     final isTablet = _isTablet(context);
     final adSize = _getAdSize(context);
     final bannerHeight = adSize.height.toDouble();
-    
+
     // Si hay error, mostrar mensaje
     if (_errorMessage != null) {
       return Container(

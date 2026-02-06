@@ -1,6 +1,7 @@
 enum CryptoPlatform {
   binance,
   kucoin,
+  bybit,
   okx,
   bitget;
 
@@ -10,6 +11,8 @@ enum CryptoPlatform {
         return 'Binance P2P';
       case CryptoPlatform.kucoin:
         return 'KuCoin P2P';
+      case CryptoPlatform.bybit:
+        return 'Bybit P2P';
       case CryptoPlatform.okx:
         return 'OKX P2P';
       case CryptoPlatform.bitget:
@@ -24,6 +27,8 @@ enum CryptoPlatform {
         return 'assets/platforms/binance_logo.png';
       case CryptoPlatform.kucoin:
         return 'assets/platforms/kucoin_logo.png';
+      case CryptoPlatform.bybit:
+        return 'assets/platforms/bybit_logo.png';
       case CryptoPlatform.okx:
         return 'assets/platforms/okx_logo.png';
       case CryptoPlatform.bitget:

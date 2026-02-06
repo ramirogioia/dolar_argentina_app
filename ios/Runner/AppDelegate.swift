@@ -5,6 +5,10 @@ import FirebaseMessaging
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
+  /// Token APNs recibido antes de que Firebase esté listo (p. ej. en release/TestFlight).
+  /// Se asigna a FCM cuando Dart notifica por method channel que Firebase ya está inicializado.
+  static var pendingAPNsToken: Data?
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -15,17 +19,45 @@ import FirebaseMessaging
     if #available(iOS 10.0, *) {
       application.registerForRemoteNotifications()
     }
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    // Registrar method channel cuando la ventana esté lista (Dart nos avisará "Firebase listo").
+    DispatchQueue.main.async { [weak self] in
+      self?.registerFCMMethodChannel()
+    }
+    return result
+  }
+
+  private func registerFCMMethodChannel() {
+    guard let controller = window?.rootViewController as? FlutterViewController else { return }
+    let channel = FlutterMethodChannel(
+      name: "com.rgioia.dolarargentina/fcm",
+      binaryMessenger: controller.binaryMessenger
+    )
+    channel.setMethodCallHandler { [weak self] call, result in
+      if call.method == "onFirebaseReady" {
+        if let token = AppDelegate.pendingAPNsToken {
+          Messaging.messaging().apnsToken = token
+          AppDelegate.pendingAPNsToken = nil
+          print("[AppDelegate] APNs token asignado a FCM tras notificación de Dart")
+        }
+        result(nil)
+      } else {
+        result(FlutterMethodNotImplemented)
+      }
+    }
   }
 
   // Pasar el token APNs a Firebase. Sin esto, FCM no puede entregar notificaciones en iOS.
-  // Solo asignar si Firebase ya está configurado (p. ej. por Flutter); si no, evitar crash.
+  // Si Firebase aún no está configurado (común en release/TestFlight), guardar y asignar cuando Dart avise.
   override func application(
     _ application: UIApplication,
     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
   ) {
     if FirebaseApp.app() != nil {
       Messaging.messaging().apnsToken = deviceToken
+    } else {
+      AppDelegate.pendingAPNsToken = deviceToken
+      print("[AppDelegate] Token APNs recibido; Firebase no listo aún, guardado para asignar después")
     }
   }
 }

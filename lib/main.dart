@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui' show PlatformDispatcher;
@@ -11,51 +12,64 @@ import 'app/router/app_router.dart';
 import 'app/theme/app_theme.dart';
 import 'features/settings/providers/settings_providers.dart';
 import 'services/fcm_service.dart';
-import 'utils/logger.dart';
 
 /// True si Firebase se inicializó correctamente (evita crashes al usar Crashlytics/FCM).
 bool _firebaseInitialized = false;
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Modo inmersivo: oculta barras del sistema para screenshots limpios
-  SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-
-  // Inicializar Firebase (debe ser antes de cualquier otro servicio de Firebase)
-  try {
-    await Firebase.initializeApp();
-    _firebaseInitialized = true;
-    Logger.info('Firebase inicializado correctamente');
-  } catch (e) {
-    Logger.error('Error al inicializar Firebase', error: e);
-    Logger.warning('Verifica que los archivos google-services.json (Android) y GoogleService-Info.plist (iOS) estén presentes');
-  }
-
-  // Crashlytics: solo si Firebase está listo; handlers nunca deben lanzar (Apple castiga crashes)
-  if (_firebaseInitialized) {
-    try {
-      FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
-      FlutterError.onError = (details) {
-        try {
-          FirebaseCrashlytics.instance.recordFlutterFatalError(details);
-        } catch (_) {}
-      };
-      PlatformDispatcher.instance.onError = (error, stack) {
-        try {
-          FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-        } catch (_) {}
-        return true;
-      };
-    } catch (_) {}
-  }
-
+void main() {
+  // Toda la inicialización y runApp deben ejecutarse en la MISMA Zone para evitar
+  // "Zone mismatch" (crash en Android/Google devices). ensureInitialized + runApp
+  // dentro del mismo runZonedGuarded.
   runZonedGuarded<Future<void>>(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+
+    // Modo captura para Store: pantalla limpia (sin barra de navegación ni estado).
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
+    // Inicializar Firebase (debe ser antes de cualquier otro servicio de Firebase)
+    try {
+      await Firebase.initializeApp();
+      _firebaseInitialized = true;
+      print('✅ Firebase inicializado correctamente');
+      // iOS: avisar a nativo que Firebase está listo para asignar el token APNs si llegó antes
+      if (Platform.isIOS) {
+        try {
+          await const MethodChannel('com.rgioia.dolarargentina/fcm')
+              .invokeMethod<void>('onFirebaseReady');
+        } catch (_) {}
+      }
+    } catch (e) {
+      print('❌ Error al inicializar Firebase: $e');
+      print(
+          '⚠️ Verifica que los archivos google-services.json (Android) y GoogleService-Info.plist (iOS) estén presentes');
+    }
+
+    // Crashlytics: solo si Firebase está listo; handlers nunca deben lanzar (Apple castiga crashes)
+    if (_firebaseInitialized) {
+      try {
+        FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
+        FlutterError.onError = (details) {
+          try {
+            FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+          } catch (_) {}
+        };
+        PlatformDispatcher.instance.onError = (error, stack) {
+          try {
+            FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+          } catch (_) {}
+          return true;
+        };
+      } catch (_) {}
+    }
+
     runApp(
       const ProviderScope(
         child: DolarArgentinaApp(),
       ),
     );
+
+    // Inicializar servicios pesados DESPUÉS de que la app arranque (en background)
+    _initializeHeavyServices();
   }, (error, stack) {
     try {
       if (_firebaseInitialized) {
@@ -63,9 +77,6 @@ void main() async {
       }
     } catch (_) {}
   });
-
-  // Inicializar servicios pesados DESPUÉS de que la app arranque (en background)
-  _initializeHeavyServices();
 }
 
 /// Inicializa servicios pesados en background después de que la app arranque
@@ -87,9 +98,9 @@ void _initializeHeavyServices() {
 /// Inicializa AdMob de forma asíncrona (fire and forget)
 void _initializeAdMob() {
   MobileAds.instance.initialize().then((_) {
-    Logger.info('AdMob inicializado correctamente');
+    print('✅ AdMob inicializado correctamente');
   }).catchError((e) {
-    Logger.error('Error al inicializar AdMob', error: e);
+    print('⚠️ Error al inicializar AdMob: $e');
   });
 }
 

@@ -92,18 +92,67 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
             error: (error, stack) => _buildErrorState(context, ref, error),
           ),
-          // Botón de configuración flotante en la esquina superior derecha
+          // Pill vertical con botones flotantes en la esquina superior derecha
           Positioned(
             top: MediaQuery.of(context).padding.top + 8,
             right: 8,
-            child: IconButton(
-              icon: Icon(
-                Icons.settings,
-                color: Theme.of(context).colorScheme.primary,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF2C2C2C).withOpacity(0.9)
+                    : Colors.white.withOpacity(0.95),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF3C3C3C)
+                      : Colors.grey.shade300,
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              onPressed: () => context.push('/settings'),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Botón de configuración
+                  IconButton(
+                    icon: Icon(
+                      Icons.settings,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 24,
+                    ),
+                    onPressed: () => context.push('/settings'),
+                    padding: const EdgeInsets.all(8),
+                    constraints: const BoxConstraints(),
+                  ),
+                  // Divisor sutil
+                  Container(
+                    width: 24,
+                    height: 1,
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey.shade700
+                        : Colors.grey.shade300,
+                  ),
+                  // Botón de calculadora
+                  IconButton(
+                    icon: Icon(
+                      Icons.calculate_outlined,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 24,
+                    ),
+                    onPressed: () => context.push('/calculator'),
+                    padding: const EdgeInsets.all(8),
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

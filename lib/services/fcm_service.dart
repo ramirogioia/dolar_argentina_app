@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -40,18 +41,27 @@ class FCMService {
     _navigatorKey = navigatorKey;
 
     try {
+      // iOS: avisar a nativo que Firebase está listo (por si el token APNs llegó antes)
+      if (Platform.isIOS) {
+        try {
+          await const MethodChannel('com.rgioia.dolarargentina/fcm')
+              .invokeMethod<void>('onFirebaseReady');
+        } catch (_) {}
+      }
+
       // 1. Inicializar notificaciones locales para Android
       await _initializeLocalNotifications();
 
       // 2. Solicitar permisos del sistema en Android 13+ (API 33+)
       if (Platform.isAndroid) {
-        final androidPlugin = _localNotifications
-            .resolvePlatformSpecificImplementation<
+        final androidPlugin =
+            _localNotifications.resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin>();
         if (androidPlugin != null) {
           final granted = await androidPlugin.requestNotificationsPermission();
           if (granted != null) {
-            Logger.fcm('Permiso POST_NOTIFICATIONS (Android 13+): ${granted ? "Concedido" : "Denegado"}');
+            Logger.fcm(
+                'Permiso POST_NOTIFICATIONS (Android 13+): ${granted ? "Concedido" : "Denegado"}');
           }
         }
       }
@@ -64,7 +74,8 @@ class FCMService {
         provisional: false,
       );
 
-      Logger.fcm('Estado de permisos Firebase: ${settings.authorizationStatus}');
+      Logger.fcm(
+          'Estado de permisos Firebase: ${settings.authorizationStatus}');
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
@@ -75,100 +86,152 @@ class FCMService {
 
         for (int attempt = 1; attempt <= maxTokenRetries; attempt++) {
           try {
-            print('🔍 [FCM] Obteniendo token FCM (intento $attempt/$maxTokenRetries)...');
-            Logger.fcm('Obteniendo token FCM (intento $attempt/$maxTokenRetries)...');
-            print('   [FCM] Esperando respuesta de Google Play Services/Firebase...');
-            Logger.debug('Esperando respuesta de Google Play Services/Firebase...', tag: 'FCM');
-            
+            print(
+                '🔍 [FCM] Obteniendo token FCM (intento $attempt/$maxTokenRetries)...');
+            Logger.fcm(
+                'Obteniendo token FCM (intento $attempt/$maxTokenRetries)...');
+            print(
+                '   [FCM] Esperando respuesta de Google Play Services/Firebase...');
+            Logger.debug(
+                'Esperando respuesta de Google Play Services/Firebase...',
+                tag: 'FCM');
+
             // Timeout progresivo: 30s, 45s, 60s (más tiempo en emuladores)
             final timeoutSeconds = 30 + (attempt * 15);
             print('   [FCM] Timeout configurado: ${timeoutSeconds}s');
             Logger.debug('Timeout configurado: ${timeoutSeconds}s', tag: 'FCM');
-            
+
             token = await _messaging.getToken().timeout(
-                  Duration(seconds: timeoutSeconds),
-                  onTimeout: () {
-                    print('⏱️ [FCM] Timeout después de ${timeoutSeconds}s');
-                    Logger.warning('Timeout después de ${timeoutSeconds}s', tag: 'FCM');
-                    throw TimeoutException('Timeout al obtener token FCM después de ${timeoutSeconds}s');
-                  },
-                );
+              Duration(seconds: timeoutSeconds),
+              onTimeout: () {
+                print('⏱️ [FCM] Timeout después de ${timeoutSeconds}s');
+                Logger.warning('Timeout después de ${timeoutSeconds}s',
+                    tag: 'FCM');
+                throw TimeoutException(
+                    'Timeout al obtener token FCM después de ${timeoutSeconds}s');
+              },
+            );
 
             print('✅ [FCM] Respuesta recibida de getToken()');
             Logger.debug('Respuesta recibida de getToken()', tag: 'FCM');
-            
+
             if (token != null && token.isNotEmpty) {
               print('✅ ✅ ✅ [FCM] TOKEN FCM OBTENIDO EXITOSAMENTE ✅ ✅ ✅');
               Logger.info('TOKEN FCM OBTENIDO EXITOSAMENTE');
-              print('   [FCM] Primeros 30 caracteres: ${token.substring(0, token.length > 30 ? 30 : token.length)}...');
-              Logger.info('Primeros 30 caracteres: ${token.substring(0, token.length > 30 ? 30 : token.length)}...', tag: 'FCM');
+              print(
+                  '   [FCM] Primeros 30 caracteres: ${token.substring(0, token.length > 30 ? 30 : token.length)}...');
+              Logger.info(
+                  'Primeros 30 caracteres: ${token.substring(0, token.length > 30 ? 30 : token.length)}...',
+                  tag: 'FCM');
               print('📱 [FCM] Token completo (cópialo para debugging):');
-              Logger.info('Token completo (cópialo para debugging):', tag: 'FCM');
+              Logger.info('Token completo (cópialo para debugging):',
+                  tag: 'FCM');
               print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-              Logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', tag: 'FCM');
+              Logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+                  tag: 'FCM');
               print(token);
               Logger.info(token, tag: 'FCM');
               print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-              Logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', tag: 'FCM');
+              Logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+                  tag: 'FCM');
               if (Platform.isIOS) {
-                print('🍎 [FCM] iOS: Si no recibís notificaciones en el iPhone, subí la clave APNs (.p8) en Firebase:');
-                Logger.info('iOS: Si no recibís notificaciones en el iPhone, subí la clave APNs (.p8) en Firebase:', tag: 'FCM');
-                print('   [FCM] Firebase Console → Configuración → Cloud Messaging → Configuración de apps de Apple.');
-                Logger.info('Firebase Console → Configuración → Cloud Messaging → Configuración de apps de Apple.', tag: 'FCM');
+                print(
+                    '🍎 [FCM] iOS: Si no recibís notificaciones en el iPhone, subí la clave APNs (.p8) en Firebase:');
+                Logger.info(
+                    'iOS: Si no recibís notificaciones en el iPhone, subí la clave APNs (.p8) en Firebase:',
+                    tag: 'FCM');
+                print(
+                    '   [FCM] Firebase Console → Configuración → Cloud Messaging → Configuración de apps de Apple.');
+                Logger.info(
+                    'Firebase Console → Configuración → Cloud Messaging → Configuración de apps de Apple.',
+                    tag: 'FCM');
               }
               break; // Éxito, salir del loop
             } else {
               print('⚠️ ⚠️ ⚠️ [FCM] Token FCM es null o vacío ⚠️ ⚠️ ⚠️');
               Logger.warning('Token FCM es null o vacío');
-              print('   [FCM] Esto es inesperado. Revisar configuración de Firebase.');
-              Logger.warning('Esto es inesperado. Revisar configuración de Firebase.', tag: 'FCM');
+              print(
+                  '   [FCM] Esto es inesperado. Revisar configuración de Firebase.');
+              Logger.warning(
+                  'Esto es inesperado. Revisar configuración de Firebase.',
+                  tag: 'FCM');
             }
           } catch (e) {
             final errorMsg = e.toString().toLowerCase();
             print('❌ [FCM] Error en intento $attempt: $e');
             Logger.error('Error en intento $attempt', error: e, tag: 'FCM');
-            
+
             // Manejar SERVICE_NOT_AVAILABLE específicamente (común en emuladores)
-            if (errorMsg.contains('service_not_available') || errorMsg.contains('service_not_availabl')) {
-              print('⚠️ [FCM] Google Play Services no está disponible (común en emuladores)');
-              Logger.warning('Google Play Services no está disponible (común en emuladores)', tag: 'FCM');
-              
+            if (errorMsg.contains('service_not_available') ||
+                errorMsg.contains('service_not_availabl')) {
+              print(
+                  '⚠️ [FCM] Google Play Services no está disponible (común en emuladores)');
+              Logger.warning(
+                  'Google Play Services no está disponible (común en emuladores)',
+                  tag: 'FCM');
+
               if (attempt < maxTokenRetries) {
                 // Esperar más tiempo para SERVICE_NOT_AVAILABLE (10s, 20s, 30s)
                 final waitSeconds = attempt * 10;
-                print('   [FCM] Esperando $waitSeconds segundos antes de reintentar...');
-                Logger.debug('Esperando $waitSeconds segundos antes de reintentar...', tag: 'FCM');
+                print(
+                    '   [FCM] Esperando $waitSeconds segundos antes de reintentar...');
+                Logger.debug(
+                    'Esperando $waitSeconds segundos antes de reintentar...',
+                    tag: 'FCM');
                 await Future.delayed(Duration(seconds: waitSeconds));
                 continue;
               } else {
-                print('⚠️ [FCM] No se pudo obtener token después de $maxTokenRetries intentos');
-                print('   [FCM] Esto es común en emuladores. Intentando en background...');
-                Logger.warning('No se pudo obtener token después de $maxTokenRetries intentos', tag: 'FCM');
-                Logger.info('Esto es común en emuladores. Intentando en background...', tag: 'FCM');
-                
+                print(
+                    '⚠️ [FCM] No se pudo obtener token después de $maxTokenRetries intentos');
+                print(
+                    '   [FCM] Esto es común en emuladores. Intentando en background...');
+                Logger.warning(
+                    'No se pudo obtener token después de $maxTokenRetries intentos',
+                    tag: 'FCM');
+                Logger.info(
+                    'Esto es común en emuladores. Intentando en background...',
+                    tag: 'FCM');
+
                 // Intentar obtener el token en background inmediatamente
                 _obtenerTokenEnBackground(autoSubscribe);
                 break;
               }
             } else if (errorMsg.contains('timeout') || e is TimeoutException) {
-              print('⏱️ [FCM] Timeout al obtener token (intento $attempt/$maxTokenRetries)');
-              Logger.warning('Timeout al obtener token (intento $attempt/$maxTokenRetries)', tag: 'FCM');
-              Logger.debug('Google Play Services está tardando más de lo esperado...', tag: 'FCM');
+              print(
+                  '⏱️ [FCM] Timeout al obtener token (intento $attempt/$maxTokenRetries)');
+              Logger.warning(
+                  'Timeout al obtener token (intento $attempt/$maxTokenRetries)',
+                  tag: 'FCM');
+              Logger.debug(
+                  'Google Play Services está tardando más de lo esperado...',
+                  tag: 'FCM');
               if (attempt < maxTokenRetries) {
                 final waitSeconds = attempt * 5;
-                print('   [FCM] Esperando $waitSeconds segundos antes de reintentar...');
-                Logger.debug('Esperando $waitSeconds segundos antes de reintentar...', tag: 'FCM');
+                print(
+                    '   [FCM] Esperando $waitSeconds segundos antes de reintentar...');
+                Logger.debug(
+                    'Esperando $waitSeconds segundos antes de reintentar...',
+                    tag: 'FCM');
                 await Future.delayed(Duration(seconds: waitSeconds));
                 continue;
               } else {
-                print('⚠️ [FCM] No se pudo obtener token después de $maxTokenRetries intentos');
+                print(
+                    '⚠️ [FCM] No se pudo obtener token después de $maxTokenRetries intentos');
                 print('   [FCM] Intentando en background...');
-                Logger.error('No se pudo obtener token después de $maxTokenRetries intentos', tag: 'FCM');
-                Logger.warning('Esto es común en emuladores. Google Play Services puede estar lento.', tag: 'FCM');
-                Logger.info('Solución: Prueba en un dispositivo físico o espera más tiempo.', tag: 'FCM');
+                Logger.error(
+                    'No se pudo obtener token después de $maxTokenRetries intentos',
+                    tag: 'FCM');
+                Logger.warning(
+                    'Esto es común en emuladores. Google Play Services puede estar lento.',
+                    tag: 'FCM');
+                Logger.info(
+                    'Solución: Prueba en un dispositivo físico o espera más tiempo.',
+                    tag: 'FCM');
 
                 // Intentar obtener el token en background después de un delay
-                Logger.debug('Intentando obtener token en background (puede tardar más)...', tag: 'FCM');
+                Logger.debug(
+                    'Intentando obtener token en background (puede tardar más)...',
+                    tag: 'FCM');
                 _obtenerTokenEnBackground(autoSubscribe);
                 break;
               }
@@ -178,14 +241,17 @@ class FCMService {
               Logger.debug('Tipo de error: ${e.runtimeType}', tag: 'FCM');
               if (attempt < maxTokenRetries) {
                 final waitSeconds = attempt * 3;
-                print('   [FCM] Esperando $waitSeconds segundos antes de reintentar...');
+                print(
+                    '   [FCM] Esperando $waitSeconds segundos antes de reintentar...');
                 await Future.delayed(Duration(seconds: waitSeconds));
                 continue;
               } else {
                 print('⚠️ [FCM] Sin token, no se puede suscribir al topic');
                 print('   [FCM] Intentando obtener token en background...');
-                Logger.warning('Sin token, no se puede suscribir al topic', tag: 'FCM');
-                Logger.debug('Intentando obtener token en background...', tag: 'FCM');
+                Logger.warning('Sin token, no se puede suscribir al topic',
+                    tag: 'FCM');
+                Logger.debug('Intentando obtener token en background...',
+                    tag: 'FCM');
                 _obtenerTokenEnBackground(autoSubscribe);
                 break;
               }
@@ -199,7 +265,7 @@ class FCMService {
         print('   - autoSubscribe: $autoSubscribe');
         print('   - token disponible: ${token != null}');
         print('   - token length: ${token?.length ?? 0}');
-        
+
         if (autoSubscribe && token != null) {
           print('🔍 Intentando suscribirse al topic "all_users"...');
           try {
@@ -207,12 +273,14 @@ class FCMService {
             print('✅ Suscripción al topic completada (o intentada)');
           } catch (e) {
             print('❌ Error al suscribirse al topic: $e');
-            print('⚠️ La app puede no recibir notificaciones hasta que se resuelva esto');
+            print(
+                '⚠️ La app puede no recibir notificaciones hasta que se resuelva esto');
           }
         } else if (!autoSubscribe) {
           print(
               'ℹ️ Auto-suscripción deshabilitada (notificaciones desactivadas por el usuario)');
-          print('   El usuario debe activar notificaciones en Configuración para recibir notificaciones');
+          print(
+              '   El usuario debe activar notificaciones en Configuración para recibir notificaciones');
         } else if (token == null) {
           print('⚠️ No se puede suscribir ahora: token FCM no disponible');
           print(
@@ -292,7 +360,7 @@ class FCMService {
   /// Configura los handlers para diferentes estados de la app
   static void _setupMessageHandlers() {
     print('🔍 Configurando handlers de notificaciones...');
-    
+
     // Handler para cuando la app está en foreground
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       print('📨 📨 📨 NOTIFICACIÓN RECIBIDA EN FOREGROUND 📨 📨 📨');
@@ -304,7 +372,7 @@ class FCMService {
 
       _handleForegroundMessage(message);
     });
-    
+
     print('✅ Handler de foreground configurado');
 
     // Handler para cuando el usuario toca una notificación y la app está en background
@@ -315,7 +383,7 @@ class FCMService {
       print('   Data: ${message.data}');
       _handleNotificationTap(message);
     });
-    
+
     print('✅ Handler de background configurado');
 
     // Handler para cuando el usuario toca una notificación y la app estaba cerrada
@@ -323,7 +391,8 @@ class FCMService {
         .getInitialMessage()
         .then((RemoteMessage? message) {
       if (message != null) {
-        print('📨 📨 📨 USUARIO TOCÓ NOTIFICACIÓN (APP ESTABA CERRADA) 📨 📨 📨');
+        print(
+            '📨 📨 📨 USUARIO TOCÓ NOTIFICACIÓN (APP ESTABA CERRADA) 📨 📨 📨');
         print('   Título: ${message.notification?.title}');
         print('   Cuerpo: ${message.notification?.body}');
         print('   Data: ${message.data}');
@@ -335,7 +404,7 @@ class FCMService {
         print('ℹ️ No hay notificación pendiente (app abierta normalmente)');
       }
     });
-    
+
     print('✅ Handler de app cerrada configurado');
   }
 
@@ -427,15 +496,17 @@ class FCMService {
   static Future<void> _obtenerTokenEnBackground(bool autoSubscribe) async {
     print('🔄 [FCM] Programando obtención de token en background...');
     Logger.debug('Programando obtención de token en background...', tag: 'FCM');
-    
+
     // Esperar más tiempo en background para darle chance a Google Play Services
     Future.delayed(const Duration(seconds: 15), () async {
       try {
         print('🔄 [FCM] Reintentando obtener token FCM en background...');
         print('   [FCM] Esto puede tardar hasta 90 segundos en emuladores...');
-        Logger.debug('Reintentando obtener token FCM en background...', tag: 'FCM');
-        Logger.debug('Esto puede tardar hasta 90 segundos en emuladores...', tag: 'FCM');
-        
+        Logger.debug('Reintentando obtener token FCM en background...',
+            tag: 'FCM');
+        Logger.debug('Esto puede tardar hasta 90 segundos en emuladores...',
+            tag: 'FCM');
+
         final token = await _messaging.getToken().timeout(
           const Duration(seconds: 90),
           onTimeout: () {
@@ -448,8 +519,11 @@ class FCMService {
         if (token != null && token.isNotEmpty) {
           print('✅ ✅ ✅ [FCM] TOKEN FCM OBTENIDO EN BACKGROUND ✅ ✅ ✅');
           Logger.info('TOKEN FCM OBTENIDO EN BACKGROUND');
-          print('   [FCM] Primeros 30 caracteres: ${token.substring(0, token.length > 30 ? 30 : token.length)}...');
-          Logger.info('Primeros 30 caracteres: ${token.substring(0, token.length > 30 ? 30 : token.length)}...', tag: 'FCM');
+          print(
+              '   [FCM] Primeros 30 caracteres: ${token.substring(0, token.length > 30 ? 30 : token.length)}...');
+          Logger.info(
+              'Primeros 30 caracteres: ${token.substring(0, token.length > 30 ? 30 : token.length)}...',
+              tag: 'FCM');
           print('📱 [FCM] Token completo:');
           Logger.info('Token completo:', tag: 'FCM');
           print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -461,13 +535,17 @@ class FCMService {
 
           // Intentar suscribirse ahora que tenemos el token
           if (autoSubscribe) {
-            print('🔍 [FCM] Intentando suscribirse al topic ahora que tenemos el token...');
-            Logger.fcm('Intentando suscribirse al topic ahora que tenemos el token...');
+            print(
+                '🔍 [FCM] Intentando suscribirse al topic ahora que tenemos el token...');
+            Logger.fcm(
+                'Intentando suscribirse al topic ahora que tenemos el token...');
             try {
               await subscribeToTopic();
             } catch (e) {
-              print('⚠️ [FCM] Error al suscribirse después de obtener token: $e');
-              Logger.error('Error al suscribirse después de obtener token', error: e, tag: 'FCM');
+              print(
+                  '⚠️ [FCM] Error al suscribirse después de obtener token: $e');
+              Logger.error('Error al suscribirse después de obtener token',
+                  error: e, tag: 'FCM');
             }
           }
         } else {
@@ -477,19 +555,28 @@ class FCMService {
       } catch (e) {
         final errorMsg = e.toString().toLowerCase();
         print('❌ [FCM] No se pudo obtener token en background: $e');
-        Logger.error('No se pudo obtener token en background', error: e, tag: 'FCM');
-        
+        Logger.error('No se pudo obtener token en background',
+            error: e, tag: 'FCM');
+
         if (errorMsg.contains('service_not_available')) {
           print('⚠️ [FCM] Google Play Services sigue no disponible');
-          print('   [FCM] Esto es común en emuladores sin Google Play Services actualizado');
+          print(
+              '   [FCM] Esto es común en emuladores sin Google Play Services actualizado');
           print('   [FCM] Recomendación: Prueba en un dispositivo físico');
-          Logger.warning('Google Play Services sigue no disponible', tag: 'FCM');
-          Logger.info('Esto es común en emuladores sin Google Play Services actualizado', tag: 'FCM');
+          Logger.warning('Google Play Services sigue no disponible',
+              tag: 'FCM');
+          Logger.info(
+              'Esto es común en emuladores sin Google Play Services actualizado',
+              tag: 'FCM');
         } else {
           print('💡 [FCM] Recomendación: Prueba en un dispositivo físico');
-          print('   [FCM] O verifica que Google Play Services esté actualizado en el emulador');
-          Logger.info('Recomendación: Prueba en un dispositivo físico', tag: 'FCM');
-          Logger.info('O verifica que Google Play Services esté actualizado en el emulador', tag: 'FCM');
+          print(
+              '   [FCM] O verifica que Google Play Services esté actualizado en el emulador');
+          Logger.info('Recomendación: Prueba en un dispositivo físico',
+              tag: 'FCM');
+          Logger.info(
+              'O verifica que Google Play Services esté actualizado en el emulador',
+              tag: 'FCM');
         }
       }
     });
@@ -525,8 +612,11 @@ class FCMService {
             .timeout(const Duration(seconds: 10));
 
         Logger.info('SUSCRITO AL TOPIC "all_users" EXITOSAMENTE');
-        Logger.info('La app ahora puede recibir notificaciones push', tag: 'FCM');
-        Logger.info('Para verificar: Envía una notificación de prueba desde Firebase Console', tag: 'FCM');
+        Logger.info('La app ahora puede recibir notificaciones push',
+            tag: 'FCM');
+        Logger.info(
+            'Para verificar: Envía una notificación de prueba desde Firebase Console',
+            tag: 'FCM');
         Logger.info('O desde el backend al topic "all_users"', tag: 'FCM');
         return; // Éxito, salir del loop
       } catch (e) {
@@ -713,7 +803,7 @@ class FCMService {
     // 6. Verificación específica para iOS
     if (Platform.isIOS) {
       print('6️⃣ iOS - Verificaciones específicas:');
-      
+
       // Verificar si el token APNs está configurado
       try {
         // En iOS, el token APNs se pasa automáticamente desde AppDelegate
@@ -721,24 +811,29 @@ class FCMService {
         final token = await getToken();
         if (token != null) {
           print('   ✅ Token FCM disponible (requiere token APNs configurado)');
-          print('   💡 Si el token FCM existe, el token APNs probablemente está configurado');
+          print(
+              '   💡 Si el token FCM existe, el token APNs probablemente está configurado');
         } else {
-          print('   ⚠️ Token FCM no disponible - puede indicar problema con token APNs');
+          print(
+              '   ⚠️ Token FCM no disponible - puede indicar problema con token APNs');
         }
       } catch (e) {
         print('   ❌ Error verificando token: $e');
       }
-      
+
       print('   📋 Checklist para notificaciones iOS:');
       print('   1. ¿Clave APNs (.p8) subida en Firebase Console?');
-      print('      → Firebase Console → Configuración → Cloud Messaging → Configuración de apps de Apple');
+      print(
+          '      → Firebase Console → Configuración → Cloud Messaging → Configuración de apps de Apple');
       print('   2. ¿GoogleService-Info.plist actualizado?');
       print('   3. ¿Permisos de notificaciones concedidos? (ver arriba)');
       print('   4. ¿aps-environment en production? (ver Runner.entitlements)');
-      print('   5. ¿UIBackgroundModes con remote-notification? (ver Info.plist)');
+      print(
+          '   5. ¿UIBackgroundModes con remote-notification? (ver Info.plist)');
       print('');
       print('   🔍 Para verificar en Firebase Console:');
-      print('   - Ve a: https://console.firebase.google.com/project/dolar-argentina-c7939/settings/cloudmessaging');
+      print(
+          '   - Ve a: https://console.firebase.google.com/project/dolar-argentina-c7939/settings/cloudmessaging');
       print('   - Verifica que haya una clave APNs (.p8) configurada');
       print('   - Si no hay clave, descárgala desde Apple Developer y súbela');
     }

@@ -13,11 +13,10 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/ic_notification"/>
-        <!-- AdMob App ID (Test ID para desarrollo) -->
-        <!-- Reemplazar con tu App ID real cuando publiques -->
+        <!-- AdMob App ID: mismo publisher que iOS (6119092953994163). Si en AdMob tenés una "app Android" distinta, usá su App ID (ca-app-pub-XXXX~YYYY). -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713"/>
+            android:value="ca-app-pub-6119092953994163~6222015453"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

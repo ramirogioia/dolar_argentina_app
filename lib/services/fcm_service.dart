@@ -592,6 +592,12 @@ class FCMService {
     }
   }
 
+  /// Estado actual del permiso de notificaciones (para mostrar "Abrir Ajustes" si está denegado).
+  static Future<AuthorizationStatus> getNotificationPermissionStatus() async {
+    final settings = await _messaging.getNotificationSettings();
+    return settings.authorizationStatus;
+  }
+
   /// Suscribe al topic "all_users" (método público para usar desde settings)
   /// Con retry logic y manejo de errores mejorado
   static Future<void> subscribeToTopic() async {

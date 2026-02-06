@@ -1,3 +1,7 @@
+import 'dart:io';
+
+import 'package:app_settings/app_settings.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,9 +17,37 @@ class SettingsPage extends ConsumerStatefulWidget {
   ConsumerState<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends ConsumerState<SettingsPage> {
+class _SettingsPageState extends ConsumerState<SettingsPage>
+    with WidgetsBindingObserver {
   /// Mostrar sección "Debug: Notificaciones" en Ajustes. Cambiar a true para volver a usarla.
   static const bool _showDebugNotifications = false;
+
+  late Future<AuthorizationStatus> _notificationPermissionFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _notificationPermissionFuture =
+        FCMService.getNotificationPermissionStatus();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Al volver de Ajustes, refrescar estado del permiso
+      setState(() {
+        _notificationPermissionFuture =
+            FCMService.getNotificationPermissionStatus();
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,32 +78,62 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
           const SizedBox(height: 16),
           Card(
-            child: SwitchListTile(
-              title: const Text('Notificaciones Push'),
-              subtitle: const Text(
-                'Recibe notificaciones sobre la apertura y cierre del mercado del dólar',
-              ),
-              value: ref.watch(notificationsEnabledProvider),
-              onChanged: (value) async {
-                // Actualizar el estado primero para que la UI responda inmediatamente
-                await ref
-                    .read(notificationsEnabledProvider.notifier)
-                    .setEnabled(value);
-
-                // Suscribir o desuscribir del topic según el estado (en background)
-                // No esperar para que la UI no se bloquee
-                if (value) {
-                  FCMService.subscribeToTopic().catchError((e) {
-                    print('❌ Error al suscribirse al topic: $e');
-                    // Si falla, revertir el estado (opcional, pero mejor UX)
-                    // ref.read(notificationsEnabledProvider.notifier).setEnabled(false);
-                  });
-                } else {
-                  FCMService.unsubscribeFromTopic().catchError((e) {
-                    print('❌ Error al desuscribirse del topic: $e');
-                  });
-                }
-              },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SwitchListTile(
+                  title: const Text('Notificaciones Push'),
+                  subtitle: const Text(
+                    'Recibe notificaciones sobre la apertura y cierre del mercado del dólar',
+                  ),
+                  value: ref.watch(notificationsEnabledProvider),
+                  onChanged: (value) async {
+                    await ref
+                        .read(notificationsEnabledProvider.notifier)
+                        .setEnabled(value);
+                    if (value) {
+                      FCMService.subscribeToTopic().catchError((e) {
+                        print('❌ Error al suscribirse al topic: $e');
+                      });
+                    } else {
+                      FCMService.unsubscribeFromTopic().catchError((e) {
+                        print('❌ Error al desuscribirse del topic: $e');
+                      });
+                    }
+                  },
+                ),
+                // Si el permiso está denegado (ej. usuario tocó "No" en iOS), ofrecer abrir Ajustes
+                FutureBuilder<AuthorizationStatus>(
+                  future: _notificationPermissionFuture,
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData ||
+                        snapshot.data != AuthorizationStatus.denied) {
+                      return const SizedBox.shrink();
+                    }
+                    return ListTile(
+                      leading: Icon(
+                        Icons.settings,
+                        size: 20,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      title: Text(
+                        Platform.isIOS
+                            ? 'Abrir Ajustes del iPhone'
+                            : 'Abrir Ajustes',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      subtitle: const Text(
+                        'Las notificaciones están desactivadas. Actívalas en Ajustes para recibir alertas.',
+                      ),
+                      onTap: () => AppSettings.openAppSettings(),
+                    );
+                  },
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 16),

@@ -2,6 +2,7 @@ import Flutter
 import UIKit
 import FirebaseCore
 import FirebaseMessaging
+import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -18,6 +19,8 @@ import FirebaseMessaging
     GeneratedPluginRegistrant.register(with: self)
     if #available(iOS 10.0, *) {
       application.registerForRemoteNotifications()
+      // Pedir permiso de notificaciones en iOS para que la app aparezca en Ajustes → Notificaciones
+      UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in }
     }
     let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
     // Registrar method channel cuando la ventana esté lista (Dart nos avisará "Firebase listo").

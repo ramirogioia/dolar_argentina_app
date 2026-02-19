@@ -603,7 +603,8 @@ class HttpDollarDataSource implements DollarDataSource {
       }
     } else if (dollarType == DollarType.crypto) {
       // Para dólar crypto, necesitamos seleccionar una plataforma
-      // Por defecto usamos "binance", pero intentamos mantener consistencia
+      // API usa perspectiva exchange: compra=ellos compran, venta=ellos venden.
+      // Para el usuario: Comprar=venta (lo que pagás), Vender=compra (lo que recibís)
       String? plataformaSeleccionada;
       final plataformaData = latestData['binance'] as Map<String, dynamic>?;
       if (plataformaData == null) {
@@ -614,12 +615,12 @@ class HttpDollarDataSource implements DollarDataSource {
         final primeraPlataformaData =
             latestData[plataformaSeleccionada] as Map<String, dynamic>?;
         if (primeraPlataformaData == null) return null;
-        buy = _parseDouble(primeraPlataformaData['compra']);
-        sell = _parseDouble(primeraPlataformaData['venta']);
+        buy = _parseDouble(primeraPlataformaData['venta']);
+        sell = _parseDouble(primeraPlataformaData['compra']);
       } else {
         plataformaSeleccionada = 'binance';
-        buy = _parseDouble(plataformaData['compra']);
-        sell = _parseDouble(plataformaData['venta']);
+        buy = _parseDouble(plataformaData['venta']);
+        sell = _parseDouble(plataformaData['compra']);
       }
 
       // Si algún valor es null, buscar hacia atrás en las últimas 2 horas
@@ -634,12 +635,12 @@ class HttpDollarDataSource implements DollarDataSource {
         );
         if (validData != null) {
           if (buy == null) {
-            buy = _parseDouble(validData['compra']);
+            buy = _parseDouble(validData['venta']);
             print(
                 '🔍 Valor de compra null para $plataformaSeleccionada, usando último valor válido: $buy');
           }
           if (sell == null) {
-            sell = _parseDouble(validData['venta']);
+            sell = _parseDouble(validData['compra']);
             print(
                 '🔍 Valor de venta null para $plataformaSeleccionada, usando último valor válido: $sell');
           }
@@ -668,7 +669,7 @@ class HttpDollarDataSource implements DollarDataSource {
           if (previousPlataformaData != null) {
             print(
                 '🔍 DEBUG - previousPlataformaData content (AYER): $previousPlataformaData');
-            final previousBuy = _parseDouble(previousPlataformaData['compra']);
+            final previousBuy = _parseDouble(previousPlataformaData['venta']);
             print('🔍 DEBUG - previousBuy parsed (AYER): $previousBuy');
             if (previousBuy != null && previousBuy > 0) {
               changePercent = ((buy - previousBuy) / previousBuy) * 100;
@@ -689,7 +690,7 @@ class HttpDollarDataSource implements DollarDataSource {
                   previousData[primeraPlataforma] as Map<String, dynamic>?;
               if (primeraPlataformaData != null) {
                 final previousBuy =
-                    _parseDouble(primeraPlataformaData['compra']);
+                    _parseDouble(primeraPlataformaData['venta']);
                 if (previousBuy != null && previousBuy > 0) {
                   changePercent = ((buy - previousBuy) / previousBuy) * 100;
                   print(

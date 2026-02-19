@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:io';
@@ -18,7 +19,8 @@ import '../utils/logger.dart';
 /// - Manejar notificaciones en foreground, background y cuando la app está cerrada
 /// - Navegar según el tipo de notificación recibida
 class FCMService {
-  static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  /// Lazy: evita "[core/not-initialized]" al cargar la clase antes de Firebase.initializeApp()
+  static FirebaseMessaging get _messaging => FirebaseMessaging.instance;
   static final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
 
@@ -27,6 +29,7 @@ class FCMService {
 
   static final List<String> _diagnosticLogs = [];
   static const int _maxDiagnosticLogs = 50;
+  static String? _firebaseInitError;
 
   static void _diagnosticLog(String msg) {
     final line =
@@ -37,9 +40,53 @@ class FCMService {
     }
   }
 
+  /// Error de Firebase.initializeApp() en main (si falló).
+  static void setFirebaseInitError(String? e) => _firebaseInitError = e;
+
   /// Logs de diagnóstico para Debug (iOS/notificaciones). Copiar y pegar si hay error.
   static List<String> getDiagnosticLogs() =>
       List<String>.from(_diagnosticLogs);
+
+  /// Info completa para debug: versión, Firebase, APNs, etc.
+  static Future<Map<String, String>> getFullDiagnosticInfo() async {
+    final info = <String, String>{};
+    try {
+      final pkg = await PackageInfo.fromPlatform();
+      info['version'] = '${pkg.version}+${pkg.buildNumber}';
+      info['bundleId'] = pkg.packageName;
+    } catch (_) {}
+    info['firebase_init'] = _firebaseInitError != null ? 'FAIL: $_firebaseInitError' : 'OK';
+    try {
+      Firebase.app();
+      info['firebase_app'] = 'OK';
+    } catch (e) {
+      info['firebase_app'] = 'FAIL: $e';
+    }
+    if (Platform.isIOS) {
+      try {
+        final apns = await _messaging.getAPNSToken();
+        info['apns_token_raw'] = apns != null ? 'OK (${apns.length} chars)' : 'null (iOS no entregó)';
+      } catch (e) {
+        info['apns_token_raw'] = 'ERROR: $e';
+      }
+      try {
+        final native = await const MethodChannel('com.rgioia.dolarargentina/fcm')
+            .invokeMethod<Map<dynamic, dynamic>>('getAppInfo');
+        if (native != null) {
+          for (final e in native.entries) {
+            info['ios_${e.key}'] = e.value?.toString() ?? '';
+          }
+        }
+      } catch (_) {}
+    }
+    info['platform'] = '${Platform.operatingSystem} ${Platform.operatingSystemVersion}';
+    return info;
+  }
+
+  /// Reiniciar estado para permitir "Reinicializar FCM" (retry real).
+  static void resetForReinit() {
+    _initialized = false;
+  }
 
   /// Solo iOS: log nativo APNs (AppDelegate).
   static Future<List<String>> getAPNsLog() async {

@@ -43,6 +43,7 @@ void main() {
       print('❌ Error al inicializar Firebase: $e');
       print(
           '⚠️ Verifica que los archivos google-services.json (Android) y GoogleService-Info.plist (iOS) estén presentes');
+      FCMService.setFirebaseInitError(e.toString());
     }
 
     // Crashlytics: solo si Firebase está listo; handlers nunca deben lanzar (Apple castiga crashes)

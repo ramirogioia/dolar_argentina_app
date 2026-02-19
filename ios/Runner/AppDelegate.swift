@@ -75,6 +75,21 @@ import UserNotifications
         result(AppDelegate.apnsRegistrationError ?? "")
       } else if call.method == "getAPNsLog" {
         result(AppDelegate.apnsLogLines)
+      } else if call.method == "getAppInfo" {
+        var dict: [String: Any] = [:]
+        if let bid = Bundle.main.bundleIdentifier { dict["bundleId"] = bid }
+        if let info = Bundle.main.infoDictionary {
+          if let v = info["CFBundleShortVersionString"] as? String { dict["version"] = v }
+          if let b = info["CFBundleVersion"] as? String { dict["build"] = b }
+        }
+        #if targetEnvironment(simulator)
+        dict["simulator"] = true
+        #else
+        dict["simulator"] = false
+        #endif
+        dict["apnsReceived"] = AppDelegate.apnsTokenEverReceived
+        if let err = AppDelegate.apnsRegistrationError { dict["apnsError"] = err }
+        result(dict)
       } else {
         result(FlutterMethodNotImplemented)
       }

@@ -45,16 +45,17 @@ cd ios
 # Limpiar archive anterior
 rm -rf ../build/Runner.xcarchive ../build/ipa
 
-# Archive SIN firma (evita conflicto con Automatic signing). El export firmará con distribución.
+# Archive CON firma manual: evita conflicto con "automatically signed" del proyecto.
+# Los entitlements (aps-environment) se aplican al binario.
 xcodebuild archive \
   -workspace Runner.xcworkspace \
   -scheme Runner \
   -configuration Release \
   -archivePath ../build/Runner.xcarchive \
   -destination "generic/platform=iOS" \
-  CODE_SIGN_IDENTITY="-" \
-  CODE_SIGNING_REQUIRED=NO \
-  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGN_STYLE=Manual \
+  CODE_SIGN_IDENTITY="Apple Distribution" \
+  PROVISIONING_PROFILE_SPECIFIER="Dólar ARG App Store" \
   -allowProvisioningUpdates
 
 echo ""
@@ -66,13 +67,10 @@ CERT_COUNT=$(security find-identity -v -p codesigning | grep -c "Distribution" |
 if [ "$CERT_COUNT" = "0" ]; then
   echo "❌ No se encontraron certificados de Distribution"
   echo ""
-  echo "📋 Para descargar certificados:"
-  echo "   1. Ve a https://developer.apple.com/account"
-  echo "   2. Certificates, Identifiers & Profiles > Certificates"
-  echo "   3. Descarga un certificado 'Apple Distribution'"
-  echo "   4. Doble click para instalarlo"
-  echo ""
-  echo "   O ver: ios/SETUP_CERTIFICATES.md para instrucciones detalladas"
+  echo "📋 Sin certificado el export va a fallar. Pasos:"
+  echo "   1. Lee: ios/SETUP_CERTIFICATES.md"
+  echo "   2. developer.apple.com → Certificates → Apple Distribution"
+  echo "   3. Descarga el .cer y doble click para instalarlo"
   echo ""
   echo "⚠️  Continuando sin certificados (fallará el export)..."
 else

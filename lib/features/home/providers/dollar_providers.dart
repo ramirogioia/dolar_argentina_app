@@ -123,10 +123,12 @@ final cryptoPlatformRatesProvider =
       for (final entry in platformMapping.entries) {
         final platformData = dolarCripto[entry.key] as Map<String, dynamic>?;
         if (platformData != null) {
-          final buy = _parseDouble(platformData['compra']);
-          final sell = _parseDouble(platformData['venta']);
+          // API usa perspectiva del exchange: compra=ellos compran, venta=ellos venden.
+          // Para el usuario: Comprar=lo que pagás (venta del exchange), Vender=lo que recibís (compra del exchange)
+          final buy = _parseDouble(platformData['venta']); // precio para que el usuario compre
+          final sell = _parseDouble(platformData['compra']); // precio para que el usuario venda
 
-          // Calcular variación comparando último de HOY con último de AYER
+          // Calcular variación comparando último de HOY con último de AYER (variación del precio de compra)
           double? changePercent;
           if (ultimaCorridaAyer != null && buy != null) {
             final previousCripto =
@@ -134,7 +136,7 @@ final cryptoPlatformRatesProvider =
             final previousPlatformData =
                 previousCripto?[entry.key] as Map<String, dynamic>?;
             if (previousPlatformData != null) {
-              final previousBuy = _parseDouble(previousPlatformData['compra']);
+              final previousBuy = _parseDouble(previousPlatformData['venta']);
               if (previousBuy != null && previousBuy > 0) {
                 changePercent = ((buy - previousBuy) / previousBuy) * 100;
                 print(

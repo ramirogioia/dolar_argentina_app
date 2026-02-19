@@ -20,9 +20,6 @@ class SettingsPage extends ConsumerStatefulWidget {
 
 class _SettingsPageState extends ConsumerState<SettingsPage>
     with WidgetsBindingObserver {
-  /// Mostrar sección "Debug: Notificaciones" en Ajustes (útil para diagnosticar iOS).
-  static const bool _showDebugNotifications = true;
-
   late Future<AuthorizationStatus> _notificationPermissionFuture;
 
   @override
@@ -55,7 +52,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
     final themeMode = ref.watch(themeModeProvider);
     final isDarkMode = themeMode == 'dark';
     final l10n = AppLocalizations.of(context);
-    final currentLocale = ref.watch(localeProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -75,31 +71,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                       value ? 'dark' : 'light',
                     );
               },
-            ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  title: Text(l10n.language),
-                  subtitle: Text(l10n.languageSubtitle),
-                ),
-                RadioListTile<String>(
-                  title: Text(l10n.languageEs),
-                  value: 'es',
-                  groupValue: currentLocale.isEmpty ? 'es' : currentLocale,
-                  onChanged: (v) => ref.read(localeProvider.notifier).setLocale(v ?? 'es'),
-                ),
-                RadioListTile<String>(
-                  title: Text(l10n.languageEn),
-                  value: 'en',
-                  groupValue: currentLocale.isEmpty ? 'es' : currentLocale,
-                  onChanged: (v) => ref.read(localeProvider.notifier).setLocale(v ?? 'en'),
-                ),
-              ],
             ),
           ),
           const SizedBox(height: 16),
@@ -160,24 +131,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
           ),
           const SizedBox(height: 16),
           Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Tipos de Dólar Visibles',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Selecciona qué tipos de dólar quieres ver en la pantalla principal',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[600],
-                        ),
-                  ),
-                  const SizedBox(height: 16),
-                  Builder(
+            child: ExpansionTile(
+              leading: Icon(
+                Icons.list_alt,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              title: Text(
+                'Tipos de Dólar Visibles',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              subtitle: const Text(
+                'Selecciona qué tipos de dólar quieres ver en la pantalla principal',
+                style: TextStyle(fontSize: 12),
+              ),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Builder(
                     builder: (context) {
                       final order = ref.watch(dollarTypeOrderProvider);
                       final visibility =
@@ -217,8 +189,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                       );
                     },
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 16),
@@ -301,357 +273,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
             ),
           ),
           const SizedBox(height: 16),
-          // Sección de debugging de notificaciones (oculta; poner _showDebugNotifications = true para mostrarla)
-          if (_showDebugNotifications) ...[
-            Card(
-              color: Colors.orange.shade50,
-              child: ExpansionTile(
-                leading: Icon(
-                  Icons.bug_report,
-                  color: Colors.orange.shade700,
-                ),
-                title: Text(
-                  'Debug: Notificaciones',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.orange.shade700,
-                      ),
-                ),
-                subtitle: const Text(
-                  'Herramientas para diagnosticar problemas de notificaciones',
-                  style: TextStyle(fontSize: 12),
-                ),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        FutureBuilder<String?>(
-                          future: FCMService.getToken(),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState ==
-                                ConnectionState.waiting) {
-                              return const CircularProgressIndicator();
-                            }
-
-                            final token = snapshot.data;
-
-                            if (token == null || token.isEmpty) {
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  const Text(
-                                    '❌ Token FCM no disponible',
-                                    style: TextStyle(color: Colors.red),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  if (Platform.isIOS)
-                                    FutureBuilder<Map<String, dynamic>?>(
-                                      future: FCMService.getAPNsDiagnostics(),
-                                      builder: (context, apnsSnap) {
-                                        if (!apnsSnap.hasData) {
-                                          return const SizedBox(height: 8);
-                                        }
-                                        final received = apnsSnap.data!['received'] as bool? ?? false;
-                                        final error = apnsSnap.data!['error'] as String? ?? '';
-                                        return Padding(
-                                          padding: const EdgeInsets.only(bottom: 12),
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                received
-                                                    ? '📱 iOS entregó token APNs: sí (Firebase no devolvió token FCM)'
-                                                    : '📱 iOS entregó token APNs: no → revisá build/perfil Push',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: received ? Colors.orange.shade800 : Colors.red.shade700,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                              if (error.isNotEmpty) ...[
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  'Error iOS: $error',
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: Colors.grey.shade700,
-                                                  ),
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  if (!Platform.isIOS)
-                                    Text(
-                                      'Tocá "Reintentar token y suscribir" o reiniciá la app.',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                    ),
-                                  if (Platform.isIOS)
-                                    Text(
-                                      'Si "iOS entregó token APNs: no": desinstalá la app, reiniciá el iPhone, instalá de nuevo desde TestFlight y aceptá notificaciones. Si ves un "Error iOS:" arriba, anotalo. Revisá ios/PUSH_IOS_CHECKLIST.md.',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                    ),
-                                  const SizedBox(height: 12),
-                                  // Log diagnóstico para copiar y pegar cuando hay error
-                                  FutureBuilder<Map<String, List<String>>>(
-                                    future: () async {
-                                      if (!Platform.isIOS) {
-                                        return {
-                                          'fcm': FCMService.getDiagnosticLogs(),
-                                        };
-                                      }
-                                      final iosLog =
-                                          await FCMService.getAPNsLog();
-                                      return {
-                                        'ios': iosLog,
-                                        'fcm': FCMService.getDiagnosticLogs(),
-                                      };
-                                    }(),
-                                    builder: (context, logSnap) {
-                                      if (!logSnap.hasData) {
-                                        return const SizedBox(height: 8);
-                                      }
-                                      final data = logSnap.data!;
-                                      final iosLines =
-                                          data['ios'] ?? <String>[];
-                                      final fcmLines =
-                                          data['fcm'] ?? <String>[];
-                                      if (iosLines.isEmpty &&
-                                          fcmLines.isEmpty) {
-                                        return const SizedBox.shrink();
-                                      }
-                                      final fullLog = [
-                                        if (iosLines.isNotEmpty) ...[
-                                          '--- Log iOS (nativo) ---',
-                                          ...iosLines,
-                                        ],
-                                        if (fcmLines.isNotEmpty) ...[
-                                          '--- Log FCM (Dart) ---',
-                                          ...fcmLines,
-                                        ],
-                                      ];
-                                      return Padding(
-                                        padding: const EdgeInsets.only(
-                                            bottom: 12),
-                                        child: ExpansionTile(
-                                          title: Text(
-                                            'Log diagnóstico (copiá si hay error)',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.grey.shade700,
-                                            ),
-                                          ),
-                                          children: [
-                                            Container(
-                                              width: double.infinity,
-                                              padding: const EdgeInsets.all(
-                                                  8),
-                                              decoration: BoxDecoration(
-                                                color: Colors.grey.shade100,
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                              child: SelectableText(
-                                                fullLog.join('\n'),
-                                                style: const TextStyle(
-                                                  fontFamily: 'monospace',
-                                                  fontSize: 10,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  const SizedBox(height: 12),
-                                  ElevatedButton.icon(
-                                    onPressed: () async {
-                                      final t = await FCMService.getToken();
-                                      if (context.mounted) setState(() {});
-                                      if (t != null && t.isNotEmpty) {
-                                        try {
-                                          await FCMService.subscribeToTopic();
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                    '✅ Token obtenido y suscrito a all_users'),
-                                                backgroundColor: Colors.green,
-                                              ),
-                                            );
-                                          }
-                                        } catch (e) {
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(SnackBar(
-                                              content: Text('Suscrito: $e'),
-                                              backgroundColor: Colors.orange,
-                                            ));
-                                          }
-                                        }
-                                      } else if (context.mounted) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                                'Sigue sin token. ¿Notificaciones permitidas? Dejá la app abierta un rato y tocá de nuevo.'),
-                                            duration: Duration(seconds: 4),
-                                            backgroundColor: Colors.orange,
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    icon: const Icon(Icons.refresh),
-                                    label: const Text('Reintentar token y suscribir'),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  OutlinedButton.icon(
-                                    onPressed: () async {
-                                      await FCMService.initialize();
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                                'Reinicializando FCM... Revisa los logs'),
-                                          ),
-                                        );
-                                        setState(() {});
-                                      }
-                                    },
-                                    icon: const Icon(Icons.refresh),
-                                    label: const Text('Reinicializar FCM'),
-                                  ),
-                                ],
-                              );
-                            }
-
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                const Text(
-                                  '✅ Token FCM disponible',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade200,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: SelectableText(
-                                    token,
-                                    style: const TextStyle(
-                                      fontFamily: 'monospace',
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: ElevatedButton.icon(
-                                        onPressed: () {
-                                          Clipboard.setData(
-                                              ClipboardData(text: token));
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                  '✅ Token copiado al portapapeles'),
-                                              duration: Duration(seconds: 2),
-                                            ),
-                                          );
-                                        },
-                                        icon: const Icon(Icons.copy),
-                                        label: const Text('Copiar Token'),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: ElevatedButton.icon(
-                                        onPressed: () async {
-                                          try {
-                                            await FCMService.subscribeToTopic();
-                                            if (context.mounted) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                      '✅ Suscrito al topic "all_users"'),
-                                                  backgroundColor: Colors.green,
-                                                ),
-                                              );
-                                            }
-                                          } catch (e) {
-                                            if (context.mounted) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                SnackBar(
-                                                  content: Text('❌ Error: $e'),
-                                                  backgroundColor: Colors.red,
-                                                ),
-                                              );
-                                            }
-                                          }
-                                        },
-                                        icon: const Icon(
-                                            Icons.notifications_active),
-                                        label: const Text('Suscribir'),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                ElevatedButton.icon(
-                                  onPressed: () {
-                                    FCMService.diagnosticar();
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                            '🔍 Revisa los logs de la consola'),
-                                        duration: Duration(seconds: 3),
-                                      ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.medical_services),
-                                  label: const Text(
-                                      'Ejecutar Diagnóstico Completo'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blue,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
           Card(
             child: ExpansionTile(
               leading: Icon(

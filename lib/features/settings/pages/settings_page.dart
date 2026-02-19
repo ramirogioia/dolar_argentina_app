@@ -175,7 +175,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                                   ? Colors.grey[400]
                                   : Colors.grey[600],
                             ),
-                            title: Text(type.displayName),
+                            title: Text(l10n.dollarTypeName(type)),
                             trailing: Switch(
                               value: isVisible,
                               onChanged: (value) {

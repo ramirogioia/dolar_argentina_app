@@ -10,6 +10,7 @@ import '../../../services/version_checker.dart';
 import '../../../widgets/update_dialogs.dart';
 import '../../settings/providers/settings_providers.dart';
 import '../providers/dollar_providers.dart';
+import '../../../services/review_service.dart';
 import '../widgets/ad_banner.dart';
 import '../widgets/dollar_row.dart';
 import '../widgets/home_header.dart';
@@ -30,6 +31,17 @@ class _HomePageState extends ConsumerState<HomePage> {
     // Verificar actualización inmediatamente cuando se monta el HomePage
     // Esto se ejecuta mientras el splash nativo todavía está visible
     _verificarActualizacion();
+    // Solicitar reseña tras engagement: varios días y sesiones de uso, en momento positivo
+    _maybeRequestReviewLater();
+  }
+
+  /// Pide reseña in-app si las condiciones de engagement se cumplen.
+  /// Basado en buenas prácticas: no al inicio, tras uso real, en momento positivo.
+  void _maybeRequestReviewLater() {
+    Future.delayed(const Duration(seconds: 5), () async {
+      if (!mounted) return;
+      await ReviewService.maybeRequestReview();
+    });
   }
 
   Future<void> _verificarActualizacion() async {

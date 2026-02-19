@@ -13,6 +13,7 @@ import 'app/router/app_router.dart';
 import 'app/theme/app_theme.dart';
 import 'features/settings/providers/settings_providers.dart';
 import 'services/fcm_service.dart';
+import 'services/review_service.dart';
 
 /// True si Firebase se inicializó correctamente (evita crashes al usar Crashlytics/FCM).
 bool _firebaseInitialized = false;
@@ -69,6 +70,9 @@ void main() {
         child: DolarArgentinaApp(),
       ),
     );
+
+    // Registrar apertura para solicitud de reseña (tras engagement)
+    unawaited(ReviewService.recordLaunch());
 
     // Inicializar servicios pesados DESPUÉS de que la app arranque (en background)
     _initializeHeavyServices();

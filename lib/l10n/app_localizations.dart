@@ -60,17 +60,17 @@ class AppLocalizations {
     if (isEnglish) {
       switch (type) {
         case DollarType.blue:
-          return 'Blue dollar';
+          return 'Blue Dollar';
         case DollarType.official:
-          return 'Official dollar';
+          return 'Official Dollar';
         case DollarType.crypto:
-          return 'Crypto dollar';
+          return 'Crypto Dollar';
         case DollarType.tarjeta:
-          return 'Card dollar';
+          return 'Card Dollar';
         case DollarType.mep:
-          return 'MEP dollar';
+          return 'MEP Dollar';
         case DollarType.ccl:
-          return 'CCL dollar';
+          return 'CCL Dollar';
       }
     }
     return type.displayName;
@@ -97,7 +97,7 @@ class AppLocalizations {
           ? 'Notifications are off. Turn them on in Settings to get alerts.'
           : 'Las notificaciones están desactivadas. Actívalas en Ajustes para recibir alertas.';
   String get visibleDollarTypes =>
-      isEnglish ? 'Visible dollar types' : 'Tipos de Dólar Visibles';
+      isEnglish ? 'Visible Dollar Types' : 'Tipos de Dólar Visibles';
   String get visibleDollarTypesSubtitle =>
       isEnglish
           ? 'Choose which types to show on the main screen'
@@ -118,11 +118,11 @@ class AppLocalizations {
       isEnglish ? 'Enter a valid amount' : 'Ingresá un monto válido';
   String get calculatorSourceOfficial =>
       isEnglish
-          ? 'Uses Banco Nación rate for official dollar'
+          ? 'Uses Banco Nación rate for Official Dollar'
           : 'Se usa la cotización del Banco Nación para el dólar oficial';
   String get calculatorSourceCrypto =>
       isEnglish
-          ? 'Uses Binance rate for crypto dollar'
+          ? 'Uses Binance rate for Crypto Dollar'
           : 'Se usa la cotización de Binance para el dólar cripto';
   String get bankNation => isEnglish ? '(Nación)' : '(Nación)';
   String get binanceP2P => isEnglish ? '(Binance)' : '(Binance)';

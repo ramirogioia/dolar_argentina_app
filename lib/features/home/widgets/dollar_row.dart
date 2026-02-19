@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../app/utils/currency_formatter.dart';
 import '../../../domain/models/bank.dart';
 import '../../../domain/models/crypto_platform.dart';
 import '../../../domain/models/dollar_rate.dart';
 import '../../../domain/models/dollar_type.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../settings/providers/settings_providers.dart';
 import '../providers/dollar_providers.dart';
 
 class DollarRow extends ConsumerWidget {
@@ -61,6 +64,9 @@ class DollarRow extends ConsumerWidget {
       displayRate = rate;
     }
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final locale = ref.watch(localeProvider);
+    final isEn = locale == 'en';
+    final l10n = AppLocalizations.of(context);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -86,80 +92,146 @@ class DollarRow extends ConsumerWidget {
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header: título | dropdown (centrado) | variación
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  rate.type.displayName,
-                  style:
-                      Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                            letterSpacing: -0.3,
-                          ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(width: 8),
-                // Espacio central: dropdown centrado entre título y variación
-                if (rate.type == DollarType.crypto)
-                  Expanded(
-                    child: Center(child: _buildPlatformDropdown(context, ref)),
-                  )
-                else if (rate.type == DollarType.official)
-                  Expanded(
-                    child: Center(child: _buildBankDropdown(context, ref)),
-                  )
-                else
-                  const Spacer(),
-                if (displayRate.changePercent != null) ...[
-                  const SizedBox(width: 8),
-                  _buildChangeIndicator(displayRate.changePercent!),
-                ],
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Compra y Venta
-            // Para Dólar Tarjeta sin Compra, mantener Venta en su posición original (derecha)
-            Row(
-              children: [
-                // Mostrar Compra si no es Tarjeta o si tiene valor
-                if (displayRate.type != DollarType.tarjeta ||
-                    displayRate.buy != null)
-                  Expanded(
-                    child: _buildPriceSection(
-                      context,
-                      'Compra',
-                      CurrencyFormatter.format(displayRate.buy),
+                // Header: título | dropdown (centrado) | variación
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      l10n.dollarTypeName(rate.type),
+                      style:
+                          Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                                letterSpacing: -0.3,
+                              ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  )
-                else
-                  // Si es Tarjeta sin Compra, espacio vacío para mantener posición de Venta
-                  const Expanded(child: SizedBox()),
-                // Solo agregar espacio si se muestra Compra
-                if (displayRate.type != DollarType.tarjeta ||
-                    displayRate.buy != null)
-                  const SizedBox(width: 16),
-                // Venta siempre se muestra en su posición original (derecha)
-                Expanded(
-                  child: _buildPriceSection(
-                    context,
-                    'Venta',
-                    CurrencyFormatter.format(displayRate.sell),
-                  ),
+                    const SizedBox(width: 8),
+                    if (rate.type == DollarType.crypto)
+                      Expanded(
+                        child: Center(child: _buildPlatformDropdown(context, ref)),
+                      )
+                    else if (rate.type == DollarType.official)
+                      Expanded(
+                        child: Center(child: _buildBankDropdown(context, ref)),
+                      )
+                    else
+                      const Spacer(),
+                    if (displayRate.changePercent != null) ...[
+                      const SizedBox(width: 8),
+                      _buildChangeIndicator(displayRate.changePercent!),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    if (displayRate.type != DollarType.tarjeta ||
+                        displayRate.buy != null)
+                      Expanded(
+                        child: _buildPriceSection(
+                          context,
+                          l10n.buy,
+                          CurrencyFormatter.format(displayRate.buy),
+                        ),
+                      )
+                    else
+                      const Expanded(child: SizedBox()),
+                    if (displayRate.type != DollarType.tarjeta ||
+                        displayRate.buy != null)
+                      const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildPriceSection(
+                        context,
+                        l10n.sell,
+                        CurrencyFormatter.format(displayRate.sell),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          // Botón compartir: borde inferior derecho
+          Positioned(
+            bottom: 6,
+            right: 6,
+            child: IconButton(
+              icon: Icon(
+                Icons.share_outlined,
+                size: 20,
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+              ),
+              style: IconButton.styleFrom(
+                padding: const EdgeInsets.all(6),
+                minimumSize: const Size(32, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: () => _shareRate(context, displayRate, isEn),
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  static String _formatShareNumber(double value, bool useComma) {
+    final int v = value.round();
+    if (useComma) {
+      return v.toString().replaceAllMapped(
+        RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+        (m) => '${m[1]},',
+      );
+    }
+    return v.toString().replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+  }
+
+  static void _shareRate(BuildContext context, DollarRate displayRate, bool isEn) {
+    final typeName = displayRate.type.displayName;
+    final buy = displayRate.buy;
+    final sell = displayRate.sell ?? 0;
+    final buyStr = buy != null && buy > 0 ? _formatShareNumber(buy, isEn) : null;
+    final sellStr = _formatShareNumber(sell, isEn);
+
+    final String text;
+    if (isEn) {
+      if (buyStr != null) {
+        text = '💵 $typeName — Today\n'
+            'Buy: \$$buyStr  ·  Sell: \$$sellStr\n\n'
+            'Source: Dólar Argentina\n'
+            'Download the app for live rates.';
+      } else {
+        text = '💵 $typeName — Today\n'
+            'Sell: \$$sellStr\n\n'
+            'Source: Dólar Argentina\n'
+            'Download the app for live rates.';
+      }
+    } else {
+      if (buyStr != null) {
+        text = '💵 $typeName — Hoy\n'
+            'Compra: \$$buyStr  ·  Venta: \$$sellStr\n\n'
+            'Fuente: Dólar Argentina\n'
+            'Descargá la app y mirá todas las cotizaciones al instante.';
+      } else {
+        text = '💵 $typeName — Hoy\n'
+            'Venta: \$$sellStr\n\n'
+            'Fuente: Dólar Argentina\n'
+            'Descargá la app y mirá todas las cotizaciones al instante.';
+      }
+    }
+    Share.share(text);
   }
 
   Widget _buildPriceSection(BuildContext context, String label, String value) {

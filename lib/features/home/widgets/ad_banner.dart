@@ -124,9 +124,8 @@ class _AdBannerState extends State<AdBanner> {
     const testIos = 'ca-app-pub-3940256099942544/2934735716';
     const testAndroid = 'ca-app-pub-3940256099942544/6300978111';
     const realIos = 'ca-app-pub-6119092953994163/2879928015';
-    // Crear unidad "Banner" para la app Android en AdMob y reemplazar el número por el ID que te den:
-    const realAndroid =
-        'ca-app-pub-6119092953994163/2879928015'; // Reemplazar /2879928015 por tu Android banner unit ID
+    // Banner home Android (AdMob - app Android)
+    const realAndroid = 'ca-app-pub-6119092953994163/5181773243';
 
     final useReal = kReleaseMode;
     if (Platform.isAndroid) {

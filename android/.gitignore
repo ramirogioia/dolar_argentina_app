@@ -12,3 +12,5 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+# Backup de contraseña del keystore (copiar y borrar; no commitear)
+.keystore-password.txt

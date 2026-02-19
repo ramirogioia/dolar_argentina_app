@@ -1,3 +1,5 @@
+import 'dart:ui' show Locale;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../domain/models/dollar_type.dart';
 import '../settings_service.dart';
@@ -205,3 +207,38 @@ class NotificationsEnabledNotifier extends StateNotifier<bool> {
     state = enabled;
   }
 }
+
+// Provider para idioma: '' = sistema, 'es' = español, 'en' = inglés
+final localeProvider = StateNotifierProvider<LocaleNotifier, String>(
+  (ref) {
+    final service = ref.watch(settingsServiceProvider);
+    return LocaleNotifier(service);
+  },
+);
+
+class LocaleNotifier extends StateNotifier<String> {
+  final SettingsService _service;
+  bool _initialized = false;
+
+  LocaleNotifier(this._service) : super('') {
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (_initialized) return;
+    state = await _service.getLocale();
+    _initialized = true;
+  }
+
+  Future<void> setLocale(String languageCode) async {
+    await _service.setLocale(languageCode);
+    state = languageCode;
+  }
+}
+
+/// Locale efectivo para MaterialApp: null = usar idioma del dispositivo.
+final appLocaleProvider = Provider<Locale?>((ref) {
+  final stored = ref.watch(localeProvider);
+  if (stored.isEmpty) return null;
+  return Locale(stored);
+});

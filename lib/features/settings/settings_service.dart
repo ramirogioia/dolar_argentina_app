@@ -7,6 +7,7 @@ class SettingsService {
   static const String _keyThemeMode = 'theme_mode'; // 'light' o 'dark'
   static const String _keyDollarTypeOrder = 'dollar_type_order';
   static const String _keyNotificationsEnabled = 'notifications_enabled';
+  static const String _keyLocale = 'locale'; // 'es', 'en' o '' (sistema)
   static const String _defaultApiUrl =
       'https://raw.githubusercontent.com/ramirogioia/dolar_argentina_back/main/data';
   static const bool _defaultDollarTypeVisible =
@@ -102,5 +103,16 @@ class SettingsService {
   Future<void> setNotificationsEnabled(bool enabled) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyNotificationsEnabled, enabled);
+  }
+
+  /// Locale: 'es', 'en' o '' (vacío = usar idioma del dispositivo).
+  Future<String> getLocale() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyLocale) ?? '';
+  }
+
+  Future<void> setLocale(String languageCode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyLocale, languageCode);
   }
 }

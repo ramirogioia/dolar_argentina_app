@@ -25,6 +25,34 @@ class FCMService {
   static bool _initialized = false;
   static GlobalKey<NavigatorState>? _navigatorKey;
 
+  static final List<String> _diagnosticLogs = [];
+  static const int _maxDiagnosticLogs = 50;
+
+  static void _diagnosticLog(String msg) {
+    final line =
+        '${DateTime.now().toIso8601String().substring(11, 23)} $msg';
+    _diagnosticLogs.add(line);
+    if (_diagnosticLogs.length > _maxDiagnosticLogs) {
+      _diagnosticLogs.removeAt(0);
+    }
+  }
+
+  /// Logs de diagnóstico para Debug (iOS/notificaciones). Copiar y pegar si hay error.
+  static List<String> getDiagnosticLogs() =>
+      List<String>.from(_diagnosticLogs);
+
+  /// Solo iOS: log nativo APNs (AppDelegate).
+  static Future<List<String>> getAPNsLog() async {
+    if (!Platform.isIOS) return [];
+    try {
+      final list = await const MethodChannel('com.rgioia.dolarargentina/fcm')
+          .invokeMethod<List<dynamic>>('getAPNsLog');
+      return (list ?? []).map((e) => e.toString()).toList();
+    } catch (e) {
+      return ['Error al leer log iOS: $e'];
+    }
+  }
+
   /// Inicializa el servicio FCM
   ///
   /// [navigatorKey] es opcional pero recomendado para navegación desde notificaciones
@@ -41,12 +69,24 @@ class FCMService {
     _navigatorKey = navigatorKey;
 
     try {
+      _diagnosticLog('FCM initialize started');
+      // Asegurar que Firebase esté inicializado (p. ej. si se tocó "Reinicializar FCM" o falló el init en main)
+      try {
+        Firebase.app();
+      } catch (_) {
+        _diagnosticLog('Firebase no listo, llamando Firebase.initializeApp()');
+        await Firebase.initializeApp();
+        _diagnosticLog('Firebase.initializeApp() OK');
+      }
       // iOS: avisar a nativo que Firebase está listo (por si el token APNs llegó antes)
       if (Platform.isIOS) {
         try {
           await const MethodChannel('com.rgioia.dolarargentina/fcm')
               .invokeMethod<void>('onFirebaseReady');
-        } catch (_) {}
+          _diagnosticLog('onFirebaseReady sent to native');
+        } catch (e) {
+          _diagnosticLog('onFirebaseReady error: $e');
+        }
       }
 
       // 1. Inicializar notificaciones locales para Android
@@ -67,6 +107,7 @@ class FCMService {
       }
 
       // 3. Solicitar permisos de Firebase (crítico para iOS y Android)
+      _diagnosticLog('Calling requestPermission...');
       final NotificationSettings settings = await _messaging.requestPermission(
         alert: true,
         badge: true,
@@ -74,11 +115,18 @@ class FCMService {
         provisional: false,
       );
 
+      _diagnosticLog(
+          'requestPermission result: ${settings.authorizationStatus}');
       Logger.fcm(
           'Estado de permisos Firebase: ${settings.authorizationStatus}');
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
+        // iOS: dar tiempo al sistema para entregar el token APNs después del permiso
+        if (Platform.isIOS) {
+          print('🍎 [FCM] iOS: esperando 2s para que el sistema entregue el token APNs...');
+          await Future.delayed(const Duration(seconds: 2));
+        }
         // 3. Obtener token FCM PRIMERO (necesario para suscribirse)
         // Intentar con retry logic porque Google Play Services puede tardar en emuladores
         String? token;
@@ -86,6 +134,7 @@ class FCMService {
 
         for (int attempt = 1; attempt <= maxTokenRetries; attempt++) {
           try {
+            _diagnosticLog('getToken attempt $attempt/$maxTokenRetries');
             print(
                 '🔍 [FCM] Obteniendo token FCM (intento $attempt/$maxTokenRetries)...');
             Logger.fcm(
@@ -116,6 +165,7 @@ class FCMService {
             Logger.debug('Respuesta recibida de getToken()', tag: 'FCM');
 
             if (token != null && token.isNotEmpty) {
+              _diagnosticLog('getToken OK (len=${token.length})');
               print('✅ ✅ ✅ [FCM] TOKEN FCM OBTENIDO EXITOSAMENTE ✅ ✅ ✅');
               Logger.info('TOKEN FCM OBTENIDO EXITOSAMENTE');
               print(
@@ -148,6 +198,7 @@ class FCMService {
               }
               break; // Éxito, salir del loop
             } else {
+              _diagnosticLog('getToken returned null/empty');
               print('⚠️ ⚠️ ⚠️ [FCM] Token FCM es null o vacío ⚠️ ⚠️ ⚠️');
               Logger.warning('Token FCM es null o vacío');
               print(
@@ -155,8 +206,15 @@ class FCMService {
               Logger.warning(
                   'Esto es inesperado. Revisar configuración de Firebase.',
                   tag: 'FCM');
+              // iOS: el token APNs puede llegar un poco después; esperar y reintentar
+              if (Platform.isIOS && attempt < maxTokenRetries) {
+                const delaySec = 3;
+                print('🍎 [FCM] iOS: esperando ${delaySec}s antes de reintentar getToken()...');
+                await Future.delayed(const Duration(seconds: delaySec));
+              }
             }
           } catch (e) {
+            _diagnosticLog('getToken attempt $attempt error: $e');
             final errorMsg = e.toString().toLowerCase();
             print('❌ [FCM] Error en intento $attempt: $e');
             Logger.error('Error en intento $attempt', error: e, tag: 'FCM');
@@ -191,6 +249,7 @@ class FCMService {
                 Logger.info(
                     'Esto es común en emuladores. Intentando en background...',
                     tag: 'FCM');
+                _diagnosticLog('No token after retries, calling _obtenerTokenEnBackground');
 
                 // Intentar obtener el token en background inmediatamente
                 _obtenerTokenEnBackground(autoSubscribe);
@@ -285,6 +344,8 @@ class FCMService {
           print('⚠️ No se puede suscribir ahora: token FCM no disponible');
           print(
               '   La suscripción se intentará automáticamente cuando el token esté disponible');
+          // Crítico para iOS: si getToken() devolvió null (p. ej. APNs aún no listo), reintentar en background y suscribir cuando llegue
+          _obtenerTokenEnBackground(autoSubscribe);
         }
 
         // 5. Configurar handler para background (debe ser top-level function)
@@ -307,6 +368,7 @@ class FCMService {
             '   El usuario debe aceptar permisos para recibir notificaciones');
       }
     } catch (e) {
+      _diagnosticLog('FCM initialize failed: $e');
       print('❌ Error al inicializar FCM Service: $e');
       print('🔍 Ejecutando diagnóstico...');
       // Ejecutar diagnóstico incluso si falla la inicialización
@@ -580,6 +642,22 @@ class FCMService {
         }
       }
     });
+
+    // iOS: segundo reintento a los 30s (el token APNs a veces tarda más)
+    if (Platform.isIOS) {
+      Future.delayed(const Duration(seconds: 30), () async {
+        try {
+          final token = await _messaging.getToken().timeout(
+            const Duration(seconds: 15),
+            onTimeout: () => throw TimeoutException('Timeout'),
+          );
+          if (token != null && token.isNotEmpty && autoSubscribe) {
+            print('🍎 [FCM] iOS: token obtenido en 2º reintento, suscribiendo...');
+            await subscribeToTopic();
+          }
+        } catch (_) {}
+      });
+    }
   }
 
   /// Obtiene el token FCM actual (útil para debugging)
@@ -596,6 +674,21 @@ class FCMService {
   static Future<AuthorizationStatus> getNotificationPermissionStatus() async {
     final settings = await _messaging.getNotificationSettings();
     return settings.authorizationStatus;
+  }
+
+  /// Solo iOS: indica si el sistema entregó el token APNs a la app (diagnóstico).
+  /// Si [received] es false, el perfil de aprovisionamiento o los entitlements no incluyen Push.
+  static Future<Map<String, dynamic>?> getAPNsDiagnostics() async {
+    if (!Platform.isIOS) return null;
+    try {
+      final received = await const MethodChannel('com.rgioia.dolarargentina/fcm')
+          .invokeMethod<bool>('hasAPNsToken');
+      final error = await const MethodChannel('com.rgioia.dolarargentina/fcm')
+          .invokeMethod<String>('getAPNsError');
+      return {'received': received ?? false, 'error': error ?? ''};
+    } catch (e) {
+      return {'received': false, 'error': e.toString()};
+    }
   }
 
   /// Suscribe al topic "all_users" (método público para usar desde settings)

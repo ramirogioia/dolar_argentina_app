@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../domain/models/dollar_rate.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../domain/models/dollar_snapshot.dart';
 import '../../../services/version_checker.dart';
 import '../../../widgets/update_dialogs.dart';
@@ -92,6 +93,12 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
             error: (error, stack) => _buildErrorState(context, ref, error),
           ),
+          // Selector de idioma: "ES" / "EN" arriba a la izquierda
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            left: 8,
+            child: const _LanguageSelector(),
+          ),
           // Pill vertical con botones flotantes en la esquina superior derecha
           Positioned(
             top: MediaQuery.of(context).padding.top + 8,
@@ -120,7 +127,6 @@ class _HomePageState extends ConsumerState<HomePage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Botón de configuración
                   IconButton(
                     icon: Icon(
                       Icons.settings,
@@ -131,7 +137,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                     padding: const EdgeInsets.all(8),
                     constraints: const BoxConstraints(),
                   ),
-                  // Divisor sutil
                   Container(
                     width: 24,
                     height: 1,
@@ -140,7 +145,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                         ? Colors.grey.shade700
                         : Colors.grey.shade300,
                   ),
-                  // Botón de calculadora
                   IconButton(
                     icon: Icon(
                       Icons.calculate_outlined,
@@ -174,6 +178,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   static Widget _buildErrorState(
       BuildContext context, WidgetRef ref, Object error) {
+    final l10n = AppLocalizations.of(context);
     final isNetwork = _isNetworkError(error);
     return Center(
       child: Padding(
@@ -190,7 +195,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
             const SizedBox(height: 20),
             Text(
-              isNetwork ? 'Sin conexión' : 'Error al cargar datos',
+              isNetwork ? l10n.noConnection : l10n.errorLoadingData,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -198,9 +203,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
             const SizedBox(height: 12),
             Text(
-              isNetwork
-                  ? 'Revisá que tengas WiFi o datos móviles activos y tocá Reintentar.'
-                  : 'No se pudieron cargar las cotizaciones.',
+              isNetwork ? l10n.errorSubtitle : l10n.errorSubtitleGeneric,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).textTheme.bodySmall?.color,
                   ),
@@ -227,7 +230,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             FilledButton.icon(
               onPressed: () => ref.invalidate(dollarSnapshotProvider),
               icon: const Icon(Icons.refresh_rounded, size: 20),
-              label: const Text('Reintentar'),
+              label: Text(l10n.retry),
             ),
           ],
         ),
@@ -322,12 +325,11 @@ class _HomePageState extends ConsumerState<HomePage> {
                       },
                     ),
                     const SizedBox(height: 8),
-                    // Texto informativo adaptado para una línea
                     Padding(
                       padding: const EdgeInsets.only(
                           left: 16, right: 16, top: 8, bottom: 12),
                       child: Text(
-                        'Datos obtenidos directamente de las entidades oficiales.',
+                        AppLocalizations.of(context).dataSourceFooter,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               fontSize: 12,
                               fontWeight: FontWeight.w400,
@@ -382,6 +384,88 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Selector de idioma: muestra "ES" o "EN" arriba a la izquierda; al tocar, opción para cambiar.
+class _LanguageSelector extends ConsumerWidget {
+  const _LanguageSelector();
+
+  static const String _flagEs = '🇪🇸';
+  static const String _flagEn = '🇬🇧';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(localeProvider);
+    final label = (current == 'en') ? '$_flagEn EN' : '$_flagEs ES';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF2C2C2C).withOpacity(0.9)
+            : Colors.white.withOpacity(0.95),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF3C3C3C)
+              : Colors.grey.shade300,
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: PopupMenuButton<String>(
+        tooltip: '',
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        offset: const Offset(0, 40),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ),
+        onSelected: (value) {
+          ref.read(localeProvider.notifier).setLocale(value);
+        },
+        itemBuilder: (context) => [
+          PopupMenuItem(
+            value: 'es',
+            child: Text(
+              '$_flagEs ES',
+              style: TextStyle(
+                fontWeight: current != 'en' ? FontWeight.w600 : FontWeight.normal,
+                color: current != 'en'
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).textTheme.bodyMedium?.color,
+              ),
+            ),
+          ),
+          PopupMenuItem(
+            value: 'en',
+            child: Text(
+              '$_flagEn EN',
+              style: TextStyle(
+                fontWeight: current == 'en' ? FontWeight.w600 : FontWeight.normal,
+                color: current == 'en'
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).textTheme.bodyMedium?.color,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

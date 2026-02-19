@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../l10n/app_localizations.dart';
 
 class HomeHeader extends StatefulWidget {
   /// Cuándo se refrescaron los datos (para "Refrescado hace X").
@@ -19,19 +20,12 @@ class HomeHeader extends StatefulWidget {
 
 class _HomeHeaderState extends State<HomeHeader> {
   Timer? _timer;
-  String _timeAgoText = '';
 
   @override
   void initState() {
     super.initState();
-    _updateTimeAgo();
-    // Actualizar cada minuto
     _timer = Timer.periodic(const Duration(minutes: 1), (_) {
-      if (mounted) {
-        setState(() {
-          _updateTimeAgo();
-        });
-      }
+      if (mounted) setState(() {});
     });
   }
 
@@ -41,29 +35,12 @@ class _HomeHeaderState extends State<HomeHeader> {
     super.dispose();
   }
 
-  void _updateTimeAgo() {
-    final now = DateTime.now();
-    final difference = now.difference(widget.updatedAt);
-
-    if (difference.inSeconds < 60) {
-      _timeAgoText = 'hace un momento';
-    } else if (difference.inMinutes == 1) {
-      _timeAgoText = 'hace 1 min';
-    } else if (difference.inMinutes < 60) {
-      _timeAgoText = 'hace ${difference.inMinutes} min';
-    } else if (difference.inHours == 1) {
-      _timeAgoText = 'hace 1 hora';
-    } else {
-      _timeAgoText = 'hace ${difference.inHours} horas';
-    }
-  }
-
-  @override
-  void didUpdateWidget(HomeHeader oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.updatedAt != widget.updatedAt) {
-      _updateTimeAgo();
-    }
+  String _timeAgoText(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final difference = DateTime.now().difference(widget.updatedAt);
+    if (difference.inSeconds < 60) return l10n.timeAgoJustNow;
+    if (difference.inMinutes < 60) return l10n.timeAgoMinutes(difference.inMinutes);
+    return l10n.timeAgoHours(difference.inHours);
   }
 
   /// Formatea la fecha/hora en zona Argentina (UTC-3), como la envía el backend.
@@ -116,9 +93,8 @@ class _HomeHeaderState extends State<HomeHeader> {
             ),
           ),
           const SizedBox(height: 1),
-          // "Refrescado hace un momento" / "Refrescado hace 2 min"
           Text(
-            'Refrescado $_timeAgoText',
+            '${AppLocalizations.of(context).refreshedPrefix} ${_timeAgoText(context)}',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   fontSize: 12,
                   fontWeight: FontWeight.w400,
@@ -130,7 +106,7 @@ class _HomeHeaderState extends State<HomeHeader> {
           if (widget.lastMeasurementAt != null) ...[
             const SizedBox(height: 4),
             Text(
-              'Última actualización: ${_formatLastMeasurement(widget.lastMeasurementAt!)}',
+              '${AppLocalizations.of(context).lastUpdate}: ${_formatLastMeasurement(widget.lastMeasurementAt!)}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     fontSize: 11,
                     fontWeight: FontWeight.w400,

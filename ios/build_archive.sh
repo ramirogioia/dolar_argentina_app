@@ -1,12 +1,40 @@
 #!/bin/bash
 set -e
 
+# Build iOS IPA para App Store Connect / TestFlight.
+# Usa tu perfil: Team 93QAZPHZ99. El archive se crea sin firma; el export firma con
+# perfil de distribución (incluye Push si está en el perfil de la cuenta).
+
 echo "📦 Preparando build de Flutter..."
+echo "   (Firma en export: tu cuenta, Team 93QAZPHZ99)"
+echo ""
 
 # Ir a la raíz del proyecto
 cd "$(dirname "$0")/.."
+SCRIPT_DIR="$(pwd)"
+IOS_DIR="$SCRIPT_DIR/ios"
 
-# Primero hacer el build de Flutter (esto ya funciona sin code signing)
+# ----- Checks previos: Push Notifications configurado -----
+echo "🔍 Verificando configuración de Push Notifications..."
+
+if [ ! -f "$IOS_DIR/Runner/Runner.entitlements" ]; then
+  echo "❌ Falta ios/Runner/Runner.entitlements"
+  exit 1
+fi
+if ! grep -q "aps-environment" "$IOS_DIR/Runner/Runner.entitlements"; then
+  echo "❌ Runner.entitlements no contiene aps-environment (necesario para notis iOS)"
+  exit 1
+fi
+echo "   ✅ Runner.entitlements tiene aps-environment"
+
+if ! grep -q "com.apple.Push" "$IOS_DIR/Runner.xcodeproj/project.pbxproj"; then
+  echo "❌ El proyecto Xcode no tiene la capability Push Notifications"
+  exit 1
+fi
+echo "   ✅ Proyecto tiene capability Push Notifications"
+echo ""
+
+# Build de Flutter sin code signing
 flutter build ios --release --no-codesign
 
 echo ""
@@ -14,20 +42,20 @@ echo "📦 Creando archive desde el build de Flutter..."
 
 cd ios
 
-# Limpiar archive anterior (el build de Flutter queda en ../build/)
+# Limpiar archive anterior
 rm -rf ../build/Runner.xcarchive ../build/ipa
 
-# Crear el archive usando el app que Flutter ya compiló
-# Deshabilitar code signing durante el archive - el export lo manejará
+# Archive SIN firma (evita conflicto con Automatic signing). El export firmará con distribución.
 xcodebuild archive \
   -workspace Runner.xcworkspace \
   -scheme Runner \
   -configuration Release \
   -archivePath ../build/Runner.xcarchive \
   -destination "generic/platform=iOS" \
+  CODE_SIGN_IDENTITY="-" \
+  CODE_SIGNING_REQUIRED=NO \
   CODE_SIGNING_ALLOWED=NO \
-  CODE_SIGN_IDENTITY="" \
-  CODE_SIGNING_REQUIRED=NO
+  -allowProvisioningUpdates
 
 echo ""
 echo "📤 Exportando IPA para App Store Connect..."
@@ -51,7 +79,6 @@ else
   echo "✅ Encontrados $CERT_COUNT certificado(s) de Distribution"
 fi
 
-# Exportar el IPA - especificando el certificado explícitamente
 echo ""
 echo "💡 Si falla con 'No Accounts' o 'Invalid trust settings':"
 echo "   1. Abre Xcode brevemente: open -a Xcode ios/Runner.xcworkspace"
@@ -61,8 +88,7 @@ echo "   4. Click en 'Download Manual Profiles'"
 echo "   5. Cierra Xcode y vuelve a ejecutar este script"
 echo ""
 
-# Intentar exportar con automatic provisioning
-echo "💡 Intentando exportar con automatic provisioning..."
+# Exportar el IPA (aquí se aplica la firma de distribución)
 xcodebuild -exportArchive \
   -archivePath ../build/Runner.xcarchive \
   -exportPath ../build/ipa \
@@ -72,56 +98,17 @@ xcodebuild -exportArchive \
     echo ""
     echo "❌ Export falló. Revisando el error..."
     echo ""
-    
+
     if echo "$EXPORT_ERROR" | grep -q "No accounts"; then
-      echo "🔴 Problema: No hay cuentas configuradas en Xcode"
-      echo ""
-      echo "Solución:"
-      echo "  1. Abre Xcode:"
-      echo "     open -a Xcode ios/Runner.xcworkspace"
-      echo ""
-      echo "  2. En Xcode:"
-      echo "     - Xcode > Settings (⌘,) > Accounts"
-      echo "     - Click en '+' > Apple ID"
-      echo "     - Ingresa tu Apple ID (con acceso al Team 93QAZPHZ99)"
-      echo "     - Selecciona el Team 93QAZPHZ99"
-      echo "     - Click en 'Download Manual Profiles'"
-      echo "     - Espera a que termine"
-      echo ""
-      echo "  3. Cierra Xcode y vuelve a ejecutar este script"
+      echo "🔴 No hay cuentas configuradas en Xcode"
+      echo "   Abre Xcode → Settings → Accounts → Agrega tu Apple ID (Team 93QAZPHZ99)"
+      echo "   Luego 'Download Manual Profiles' y vuelve a ejecutar este script."
     elif echo "$EXPORT_ERROR" | grep -q "No valid.*certificates"; then
-      echo "🔴 Problema: No hay certificados válidos"
-      echo ""
-      echo "Solución:"
-      echo "  Ver: ios/SETUP_CERTIFICATES.md"
-    elif echo "$EXPORT_ERROR" | grep -q "Invalid trust settings"; then
-      echo "🔴 Problema: Certificados con configuración de confianza inválida"
-      echo ""
-      echo "✅ SOLUCIÓN RÁPIDA:"
-      echo ""
-      echo "   Manualmente:"
-      echo "   1. Abre Keychain Access:"
-      echo "      open -a 'Keychain Access'"
-      echo ""
-      echo "   2. Selecciona 'login' keychain (lado izquierdo)"
-      echo "   3. Selecciona categoría 'My Certificates' (arriba)"
-      echo "   4. Busca certificados 'Apple Distribution' o 'Apple Development'"
-      echo "   5. Doble click en CADA certificado encontrado"
-      echo "   6. Expande 'Trust' (Confianza)"
-      echo "   7. En 'When using this certificate' selecciona: 'Use System Defaults'"
-      echo "   8. Cierra la ventana (se guarda automáticamente)"
-      echo "   9. Repite para el certificado 'Apple Worldwide Developer Relations' si existe"
-      echo ""
-      echo "   Luego vuelve a ejecutar: cd ios && ./build_archive.sh"
+      echo "🔴 No hay certificados válidos de Distribution"
+      echo "   Descarga el certificado Apple Distribution desde developer.apple.com e instálalo."
     else
-      echo "🔴 Error desconocido. Detalles:"
-      echo "$EXPORT_ERROR" | tail -20
-      echo ""
-      echo "💡 Intenta:"
-      echo "  1. Ver: ios/SETUP_CERTIFICATES.md"
-      echo "  2. Abrir Xcode y configurar la cuenta (ver arriba)"
+      echo "$EXPORT_ERROR" | tail -30
     fi
-    echo ""
     exit 1
   }
 
@@ -129,9 +116,47 @@ cd ..
 
 echo ""
 echo "✅ Build completado!"
-echo "📱 IPA disponible en: build/ipa/Runner.ipa"
+# El nombre del IPA puede ser Runner.ipa o el del scheme (ej. dolar_argentina_app.ipa)
+IPA_NAME=$(ls -1 build/ipa/*.ipa 2>/dev/null | head -1)
+if [ -n "$IPA_NAME" ]; then
+  echo "📱 IPA disponible en: $IPA_NAME"
+else
+  echo "📱 IPA en: build/ipa/"
+fi
+echo ""
+
+# ----- Check post-export: que el perfil del IPA incluya Push -----
+echo "🔍 Verificando que el perfil del IPA incluya Push..."
+IPA_PATH="${IPA_NAME:-$SCRIPT_DIR/build/ipa/Runner.ipa}"
+if [ -z "$IPA_PATH" ] || [ ! -f "$IPA_PATH" ]; then
+  IPA_PATH=$(ls -1 build/ipa/*.ipa 2>/dev/null | head -1)
+fi
+if [ -n "$IPA_PATH" ] && [ -f "$IPA_PATH" ]; then
+  UNZIP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t build_archive)
+  if unzip -q -o "$IPA_PATH" -d "$UNZIP_DIR" 2>/dev/null; then
+    PROV="$UNZIP_DIR/Payload/Runner.app/embedded.mobileprovision"
+    if [ -f "$PROV" ]; then
+      if security cms -D -i "$PROV" 2>/dev/null | grep -q "aps-environment"; then
+        echo "   ✅ Perfil del IPA incluye Push (aps-environment) → notis deberían funcionar en dispositivo"
+      else
+        echo "   ⚠️ El perfil del IPA no muestra aps-environment."
+        echo "   En Apple Developer: App ID debe tener Push Notifications; perfil de distribución debe incluirlo."
+        echo "   Desinstalá la app en el iPhone e instalá de nuevo desde TestFlight."
+      fi
+    else
+      echo "   ⚠️ No se encontró embedded.mobileprovision en el IPA"
+    fi
+  fi
+  rm -rf "$UNZIP_DIR" 2>/dev/null || true
+else
+  echo "   ⚠️ IPA no encontrado en build/ipa/, no se pudo verificar"
+fi
 echo ""
 echo "Para subir a App Store Connect:"
-echo "1. Abre Transporter app (Mac App Store)"
-echo "2. Arrastra: build/ipa/Runner.ipa"
+echo "1. Abre Transporter (Mac App Store)"
+echo "2. Arrastra el .ipa que está en: build/ipa/"
+echo ""
+echo "Si las notificaciones no funcionan en iOS:"
+echo "- En Firebase Console: subí la clave APNs (.p8) en Cloud Messaging → Apple."
+echo "- Desinstalá la app en el iPhone e instalá de nuevo desde TestFlight."
 echo ""

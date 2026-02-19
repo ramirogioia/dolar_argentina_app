@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../domain/models/dollar_type.dart';
 import '../../../domain/models/dollar_rate.dart';
+import '../../../domain/models/dollar_snapshot.dart';
 import '../../../app/theme/app_theme.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../home/providers/dollar_providers.dart';
 import '../../home/widgets/ad_banner.dart';
 
@@ -20,7 +22,6 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
   DollarType _selectedType = DollarType.blue;
   bool _isPesosToDollar = false; // Default: USD → ARS (lo más usado)
   double? _result;
-  double? _currentRate; // Cotización actual del tipo seleccionado
 
   @override
   void dispose() {
@@ -63,15 +64,11 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
     }
 
     if (rate == null || rate <= 0) {
-      setState(() {
-        _result = null;
-        _currentRate = null;
-      });
+      setState(() => _result = null);
       return;
     }
 
     setState(() {
-      _currentRate = rate;
       if (_isPesosToDollar) {
         // Pesos → Dólares
         _result = amount / rate!;
@@ -89,6 +86,20 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
       _controller.clear();
       _result = null;
     });
+  }
+
+  /// Obtiene la cotización del tipo seleccionado a partir del snapshot (para mostrar desde el inicio).
+  double? _getRateForSelectedType(DollarSnapshot? snapshot, WidgetRef ref) {
+    if (snapshot == null) return null;
+    if (_selectedType == DollarType.official) {
+      final bankRates = ref.read(bankRatesProvider);
+      if (bankRates.isEmpty) return null;
+      return bankRates.values.first.sell;
+    }
+    for (final r in snapshot.rates) {
+      if (r.type == _selectedType) return r.sell;
+    }
+    return null;
   }
 
   String _formatCurrency(double value, bool isDollar) {
@@ -111,21 +122,27 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    // Detectar si el teclado está abierto y su altura
     final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
     final isKeyboardVisible = keyboardHeight > 0;
-    
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        title: const Text('Calculadora'),
-        centerTitle: true,
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
+    final snapshotAsync = ref.watch(dollarSnapshotProvider);
+    final snapshot = snapshotAsync.valueOrNull;
+    final displayRate = _getRateForSelectedType(snapshot, ref);
+
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.opaque,
+      child: Scaffold(
+        resizeToAvoidBottomInset: true,
+        appBar: AppBar(
+          title: Text(l10n.calculator),
+          centerTitle: true,
+        ),
+        body: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
               controller: _scrollController,
               padding: const EdgeInsets.all(24),
               child: Column(
@@ -133,7 +150,7 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
                 children: [
             // Selector de tipo de dólar
             Text(
-              'Tipo de cambio',
+              l10n.exchangeRateType,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
@@ -161,13 +178,13 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
                       child: Row(
                         children: [
                           Text(
-                            type.displayName,
+                            l10n.dollarTypeName(type),
                             style: const TextStyle(fontSize: 16),
                           ),
                           if (type == DollarType.official) ...[
                             const SizedBox(width: 8),
-                            const Text(
-                              '(Nación)',
+                            Text(
+                              l10n.bankNation,
                               style: TextStyle(
                                 fontSize: 13,
                                 fontStyle: FontStyle.italic,
@@ -183,8 +200,8 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
                           ],
                         if (type == DollarType.crypto) ...[
                           const SizedBox(width: 8),
-                          const Text(
-                            '(Binance)',
+                          Text(
+                            l10n.binanceP2P,
                             style: TextStyle(
                               fontSize: 13,
                               fontStyle: FontStyle.italic,
@@ -214,13 +231,13 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
               ),
             ),
             
-            // Cotización actual (referencia) - debajo del dropdown
-            if (_currentRate != null) ...[
+            // Cotización actual (referencia) - debajo del dropdown; visible desde el inicio
+            if (displayRate != null && displayRate > 0) ...[
               const SizedBox(height: 12),
               Text(
-                _isPesosToDollar 
-                    ? '${_formatCurrency(_currentRate!, false)} = 1 USD'
-                    : '1 USD = ${_formatCurrency(_currentRate!, false)}',
+                _isPesosToDollar
+                    ? '${_formatCurrency(displayRate, false)} = 1 USD'
+                    : '1 USD = ${_formatCurrency(displayRate, false)}',
                 style: TextStyle(
                   fontSize: 13,
                   fontStyle: FontStyle.italic,
@@ -296,7 +313,7 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
             
             // Input de monto
             Text(
-              _isPesosToDollar ? 'Monto en pesos' : 'Monto en dólares',
+              _isPesosToDollar ? l10n.amountInPesos : l10n.amountInDollars,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
@@ -306,6 +323,7 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
               key: const ValueKey('calculator_input'),
               controller: _controller,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              textInputAction: TextInputAction.done,
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
               ],
@@ -342,6 +360,7 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
                 ),
               ),
               onChanged: (_) => _calculate(),
+              onSubmitted: (_) => FocusScope.of(context).unfocus(),
             ),
             
             const SizedBox(height: 32),
@@ -368,7 +387,7 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
                 child: Column(
                   children: [
                     Text(
-                      _isPesosToDollar ? 'Resultado en USD' : 'Resultado en ARS',
+                      _isPesosToDollar ? l10n.resultInUSD : l10n.resultInARS,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         color: Colors.grey.shade600,
                         fontWeight: FontWeight.w500,
@@ -406,7 +425,7 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Ingresá un monto válido',
+                        l10n.enterValidAmount,
                         style: TextStyle(
                           color: Colors.orange.shade700,
                           fontWeight: FontWeight.w500,
@@ -447,8 +466,8 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
                     Expanded(
                       child: Text(
                         _selectedType == DollarType.official
-                            ? 'Se usa la cotización del Banco Nación para el dólar oficial'
-                            : 'Se usa la cotización de Binance para el dólar cripto',
+                            ? l10n.calculatorSourceOfficial
+                            : l10n.calculatorSourceCrypto,
                         style: TextStyle(
                           fontSize: 13,
                           color: isDark
@@ -468,10 +487,11 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
           // Banner de AdMob en la parte inferior (oculto cuando el teclado está abierto)
           if (!isKeyboardVisible)
             const AdBanner(
-              customAdUnitId: 'ca-app-pub-6119092953994163/2715020872',
+              customAdUnitId: 'ca-app-pub-6119092953994163/7548189933',
             ),
         ],
       ),
+    ),
     );
   }
 }

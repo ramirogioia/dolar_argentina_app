@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../l10n/app_localizations.dart';
 import '../providers/settings_providers.dart';
 import '../../../services/fcm_service.dart';
 
@@ -19,8 +20,8 @@ class SettingsPage extends ConsumerStatefulWidget {
 
 class _SettingsPageState extends ConsumerState<SettingsPage>
     with WidgetsBindingObserver {
-  /// Mostrar sección "Debug: Notificaciones" en Ajustes. Cambiar a true para volver a usarla.
-  static const bool _showDebugNotifications = false;
+  /// Mostrar sección "Debug: Notificaciones" en Ajustes (útil para diagnosticar iOS).
+  static const bool _showDebugNotifications = true;
 
   late Future<AuthorizationStatus> _notificationPermissionFuture;
 
@@ -53,10 +54,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
     final isDarkMode = themeMode == 'dark';
+    final l10n = AppLocalizations.of(context);
+    final currentLocale = ref.watch(localeProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ajustes'),
+        title: Text(l10n.settings),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
@@ -64,10 +67,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
         children: [
           Card(
             child: SwitchListTile(
-              title: const Text('Modo Oscuro'),
-              subtitle: const Text(
-                'Activa el modo oscuro para una mejor experiencia en ambientes con poca luz',
-              ),
+              title: Text(l10n.darkMode),
+              subtitle: Text(l10n.darkModeSubtitle),
               value: isDarkMode,
               onChanged: (value) {
                 ref.read(themeModeProvider.notifier).setThemeMode(
@@ -79,13 +80,36 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
           const SizedBox(height: 16),
           Card(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  title: Text(l10n.language),
+                  subtitle: Text(l10n.languageSubtitle),
+                ),
+                RadioListTile<String>(
+                  title: Text(l10n.languageEs),
+                  value: 'es',
+                  groupValue: currentLocale.isEmpty ? 'es' : currentLocale,
+                  onChanged: (v) => ref.read(localeProvider.notifier).setLocale(v ?? 'es'),
+                ),
+                RadioListTile<String>(
+                  title: Text(l10n.languageEn),
+                  value: 'en',
+                  groupValue: currentLocale.isEmpty ? 'es' : currentLocale,
+                  onChanged: (v) => ref.read(localeProvider.notifier).setLocale(v ?? 'en'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 SwitchListTile(
-                  title: const Text('Notificaciones Push'),
-                  subtitle: const Text(
-                    'Recibe notificaciones sobre la apertura y cierre del mercado del dólar',
-                  ),
+                  title: Text(l10n.pushNotifications),
+                  subtitle: Text(l10n.pushNotificationsSubtitle),
                   value: ref.watch(notificationsEnabledProvider),
                   onChanged: (value) async {
                     await ref
@@ -118,17 +142,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                       ),
                       title: Text(
                         Platform.isIOS
-                            ? 'Abrir Ajustes del iPhone'
-                            : 'Abrir Ajustes',
+                            ? l10n.openSettingsIos
+                            : l10n.openSettings,
                         style: TextStyle(
                           fontSize: 14,
                           color: Theme.of(context).colorScheme.primary,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      subtitle: const Text(
-                        'Las notificaciones están desactivadas. Actívalas en Ajustes para recibir alertas.',
-                      ),
+                      subtitle: Text(l10n.notificationsDisabledSubtitle),
                       onTap: () => AppSettings.openAppSettings(),
                     );
                   },
@@ -317,13 +339,186 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
 
                             if (token == null || token.isEmpty) {
                               return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   const Text(
                                     '❌ Token FCM no disponible',
                                     style: TextStyle(color: Colors.red),
                                   ),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 4),
+                                  if (Platform.isIOS)
+                                    FutureBuilder<Map<String, dynamic>?>(
+                                      future: FCMService.getAPNsDiagnostics(),
+                                      builder: (context, apnsSnap) {
+                                        if (!apnsSnap.hasData) {
+                                          return const SizedBox(height: 8);
+                                        }
+                                        final received = apnsSnap.data!['received'] as bool? ?? false;
+                                        final error = apnsSnap.data!['error'] as String? ?? '';
+                                        return Padding(
+                                          padding: const EdgeInsets.only(bottom: 12),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                received
+                                                    ? '📱 iOS entregó token APNs: sí (Firebase no devolvió token FCM)'
+                                                    : '📱 iOS entregó token APNs: no → revisá build/perfil Push',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: received ? Colors.orange.shade800 : Colors.red.shade700,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                              if (error.isNotEmpty) ...[
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  'Error iOS: $error',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.grey.shade700,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  if (!Platform.isIOS)
+                                    Text(
+                                      'Tocá "Reintentar token y suscribir" o reiniciá la app.',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  if (Platform.isIOS)
+                                    Text(
+                                      'Si "iOS entregó token APNs: no": desinstalá la app, reiniciá el iPhone, instalá de nuevo desde TestFlight y aceptá notificaciones. Si ves un "Error iOS:" arriba, anotalo. Revisá ios/PUSH_IOS_CHECKLIST.md.',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  const SizedBox(height: 12),
+                                  // Log diagnóstico para copiar y pegar cuando hay error
+                                  FutureBuilder<Map<String, List<String>>>(
+                                    future: () async {
+                                      if (!Platform.isIOS) {
+                                        return {
+                                          'fcm': FCMService.getDiagnosticLogs(),
+                                        };
+                                      }
+                                      final iosLog =
+                                          await FCMService.getAPNsLog();
+                                      return {
+                                        'ios': iosLog,
+                                        'fcm': FCMService.getDiagnosticLogs(),
+                                      };
+                                    }(),
+                                    builder: (context, logSnap) {
+                                      if (!logSnap.hasData) {
+                                        return const SizedBox(height: 8);
+                                      }
+                                      final data = logSnap.data!;
+                                      final iosLines =
+                                          data['ios'] ?? <String>[];
+                                      final fcmLines =
+                                          data['fcm'] ?? <String>[];
+                                      if (iosLines.isEmpty &&
+                                          fcmLines.isEmpty) {
+                                        return const SizedBox.shrink();
+                                      }
+                                      final fullLog = [
+                                        if (iosLines.isNotEmpty) ...[
+                                          '--- Log iOS (nativo) ---',
+                                          ...iosLines,
+                                        ],
+                                        if (fcmLines.isNotEmpty) ...[
+                                          '--- Log FCM (Dart) ---',
+                                          ...fcmLines,
+                                        ],
+                                      ];
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                            bottom: 12),
+                                        child: ExpansionTile(
+                                          title: Text(
+                                            'Log diagnóstico (copiá si hay error)',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.grey.shade700,
+                                            ),
+                                          ),
+                                          children: [
+                                            Container(
+                                              width: double.infinity,
+                                              padding: const EdgeInsets.all(
+                                                  8),
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey.shade100,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: SelectableText(
+                                                fullLog.join('\n'),
+                                                style: const TextStyle(
+                                                  fontFamily: 'monospace',
+                                                  fontSize: 10,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(height: 12),
                                   ElevatedButton.icon(
+                                    onPressed: () async {
+                                      final t = await FCMService.getToken();
+                                      if (context.mounted) setState(() {});
+                                      if (t != null && t.isNotEmpty) {
+                                        try {
+                                          await FCMService.subscribeToTopic();
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                    '✅ Token obtenido y suscrito a all_users'),
+                                                backgroundColor: Colors.green,
+                                              ),
+                                            );
+                                          }
+                                        } catch (e) {
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(SnackBar(
+                                              content: Text('Suscrito: $e'),
+                                              backgroundColor: Colors.orange,
+                                            ));
+                                          }
+                                        }
+                                      } else if (context.mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                                'Sigue sin token. ¿Notificaciones permitidas? Dejá la app abierta un rato y tocá de nuevo.'),
+                                            duration: Duration(seconds: 4),
+                                            backgroundColor: Colors.orange,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    icon: const Icon(Icons.refresh),
+                                    label: const Text('Reintentar token y suscribir'),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  OutlinedButton.icon(
                                     onPressed: () async {
                                       await FCMService.initialize();
                                       if (context.mounted) {
@@ -334,8 +529,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                                                 'Reinicializando FCM... Revisa los logs'),
                                           ),
                                         );
+                                        setState(() {});
                                       }
-                                      setState(() {});
                                     },
                                     icon: const Icon(Icons.refresh),
                                     label: const Text('Reinicializar FCM'),

@@ -4,7 +4,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <!-- Permiso necesario para notificaciones en Android 13+ (API 33+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    
+    <!-- ID de publicidad: requerido para AdMob en Android 13+ (API 33+) -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
+
     <application
         android:label="Dólar Argentina"
         android:name="${applicationName}"
@@ -13,10 +15,10 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/ic_notification"/>
-        <!-- AdMob App ID: mismo publisher que iOS (6119092953994163). Si en AdMob tenés una "app Android" distinta, usá su App ID (ca-app-pub-XXXX~YYYY). -->
+        <!-- AdMob App ID Android (app "Dólar Argentina" en AdMob) -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-6119092953994163~6222015453"/>
+            android:value="ca-app-pub-6119092953994163~3815613465"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

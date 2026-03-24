@@ -111,13 +111,19 @@ final cryptoPlatformRatesProvider =
 
       final rates = Map<CryptoPlatform, DollarRate>.from(_emptyCryptoRates);
 
-      // Mapear plataformas del JSON a enums
+r      // Mapear plataformas del JSON a enums (keys = nombres en backend)
       final platformMapping = {
         'binance': CryptoPlatform.binance,
         'kucoin': CryptoPlatform.kucoin,
         'bybit': CryptoPlatform.bybit,
         'okx': CryptoPlatform.okx,
         'bitget': CryptoPlatform.bitget,
+        'dolarapp': CryptoPlatform.dolarapp,
+        'airtm': CryptoPlatform.airtm,
+        'lemon': CryptoPlatform.lemon,
+        'astropay': CryptoPlatform.astropay,
+        'cocoscrypto': CryptoPlatform.cocoscrypto,
+        'fiwind': CryptoPlatform.fiwind,
       };
 
       for (final entry in platformMapping.entries) {
@@ -210,8 +216,8 @@ final previousMarketDayOficialProvider =
 // Provider para el banco seleccionado (por defecto Banco Nación)
 final selectedBankProvider = StateProvider<Bank>((ref) => Bank.nacion);
 
-/// Bancos que scrapea el backend (dolar_oficial). Solo estos se muestran en el dropdown.
-const List<Bank> officialBanksFromBackend = [
+/// Bancos que scrapea el backend (dolar_oficial). Solo los que tienen datos se muestran en el dropdown.
+const List<Bank> _allOfficialBanks = [
   Bank.nacion,
   Bank.bbva,
   Bank.supervielle,
@@ -221,6 +227,25 @@ const List<Bank> officialBanksFromBackend = [
   Bank.hipotecario,
   Bank.icbc,
 ];
+
+/// Bancos con datos válidos (compra o venta no null). Solo estos aparecen en el dropdown.
+final banksWithDataProvider = Provider<List<Bank>>((ref) {
+  final rates = ref.watch(bankRatesProvider);
+  return _allOfficialBanks.where((b) {
+    final r = rates[b];
+    return r != null && (r.buy != null || r.sell != null);
+  }).toList();
+});
+
+/// Plataformas cripto con datos válidos (compra o venta no null). Solo estas aparecen en el dropdown.
+final platformsWithDataProvider = Provider<List<CryptoPlatform>>((ref) {
+  final ratesAsync = ref.watch(cryptoPlatformRatesProvider);
+  final rates = ratesAsync.valueOrNull ?? {};
+  return CryptoPlatform.values.where((p) {
+    final r = rates[p];
+    return r != null && (r.buy != null || r.sell != null);
+  }).toList();
+});
 
 /// Construye el mapa de tasas por banco. La variación se calcula acá en el front:
 /// si [dolarOficialPrevMarket] está disponible (día hábil anterior), se usa para comparar;

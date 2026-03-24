@@ -8,7 +8,6 @@ import '../../../domain/models/crypto_platform.dart';
 import '../../../domain/models/dollar_rate.dart';
 import '../../../domain/models/dollar_type.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../settings/providers/settings_providers.dart';
 import '../providers/dollar_providers.dart';
 
 class DollarRow extends ConsumerWidget {
@@ -42,10 +41,12 @@ class DollarRow extends ConsumerWidget {
     } else if (rate.type == DollarType.official) {
       final bankRates = ref.watch(bankRatesProvider);
       final selectedBank = ref.watch(selectedBankProvider);
-      final availableBanks = officialBanksFromBackend;
-      final effectiveBank = availableBanks.contains(selectedBank)
+      final availableBanks = ref.watch(banksWithDataProvider);
+      final effectiveBanks =
+          availableBanks.isNotEmpty ? availableBanks : [Bank.nacion];
+      final effectiveBank = effectiveBanks.contains(selectedBank)
           ? selectedBank
-          : availableBanks.first;
+          : effectiveBanks.first;
       displayRate = bankRates[effectiveBank] ?? rate;
       // Si el rate del provider no tiene changePercent pero el rate original sí,
       // y son del mismo banco, mantener el changePercent del original
@@ -64,8 +65,6 @@ class DollarRow extends ConsumerWidget {
       displayRate = rate;
     }
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final locale = ref.watch(localeProvider);
-    final isEn = locale == 'en';
     final l10n = AppLocalizations.of(context);
 
     return Container(
@@ -176,7 +175,7 @@ class DollarRow extends ConsumerWidget {
                 minimumSize: const Size(32, 32),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              onPressed: () => _shareRate(context, displayRate, isEn),
+              onPressed: () => _shareRate(context, displayRate, l10n),
             ),
           ),
         ],
@@ -198,38 +197,30 @@ class DollarRow extends ConsumerWidget {
     );
   }
 
-  static void _shareRate(BuildContext context, DollarRate displayRate, bool isEn) {
-    final typeName = displayRate.type.displayName;
+  static void _shareRate(
+    BuildContext context,
+    DollarRate displayRate,
+    AppLocalizations l10n,
+  ) {
+    final typeName = l10n.dollarTypeName(displayRate.type);
     final buy = displayRate.buy;
     final sell = displayRate.sell ?? 0;
-    final buyStr = buy != null && buy > 0 ? _formatShareNumber(buy, isEn) : null;
-    final sellStr = _formatShareNumber(sell, isEn);
+    final useComma = l10n.useCommaForThousands;
+    final buyStr =
+        buy != null && buy > 0 ? _formatShareNumber(buy, useComma) : null;
+    final sellStr = _formatShareNumber(sell, useComma);
 
     final String text;
-    if (isEn) {
-      if (buyStr != null) {
-        text = '💵 $typeName — Today\n'
-            'Buy: \$$buyStr  ·  Sell: \$$sellStr\n\n'
-            'Source: Dólar Argentina\n'
-            'Download the app for live rates.';
-      } else {
-        text = '💵 $typeName — Today\n'
-            'Sell: \$$sellStr\n\n'
-            'Source: Dólar Argentina\n'
-            'Download the app for live rates.';
-      }
+    if (buyStr != null) {
+      text = '💵 $typeName — ${l10n.shareToday}\n'
+          '${l10n.shareBuyLabel}: \$$buyStr  ·  ${l10n.shareSellLabel}: \$$sellStr\n\n'
+          '${l10n.shareSource}: Dólar Argentina\n'
+          '${l10n.shareFooter}';
     } else {
-      if (buyStr != null) {
-        text = '💵 $typeName — Hoy\n'
-            'Compra: \$$buyStr  ·  Venta: \$$sellStr\n\n'
-            'Fuente: Dólar Argentina\n'
-            'Descargá la app y mirá todas las cotizaciones al instante.';
-      } else {
-        text = '💵 $typeName — Hoy\n'
-            'Venta: \$$sellStr\n\n'
-            'Fuente: Dólar Argentina\n'
-            'Descargá la app y mirá todas las cotizaciones al instante.';
-      }
+      text = '💵 $typeName — ${l10n.shareToday}\n'
+          '${l10n.shareSellLabel}: \$$sellStr\n\n'
+          '${l10n.shareSource}: Dólar Argentina\n'
+          '${l10n.shareFooter}';
     }
     Share.share(text);
   }
@@ -321,7 +312,24 @@ class DollarRow extends ConsumerWidget {
 
   Widget _buildPlatformDropdown(BuildContext context, WidgetRef ref) {
     final selectedPlatform = ref.watch(selectedCryptoPlatformProvider);
+    final availablePlatforms = ref.watch(platformsWithDataProvider);
+    final effectivePlatforms = availablePlatforms.isNotEmpty
+        ? availablePlatforms
+        : [CryptoPlatform.binance];
+    final effectivePlatform =
+        effectivePlatforms.contains(selectedPlatform)
+            ? selectedPlatform
+            : effectivePlatforms.first;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Si la selección actual no tiene datos, actualizar al primero disponible
+    if (effectivePlatforms.isNotEmpty &&
+        !effectivePlatforms.contains(selectedPlatform)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(selectedCryptoPlatformProvider.notifier).state =
+            effectivePlatforms.first;
+      });
+    }
 
     return SizedBox(
       width: 150, // Ancho para mostrar "Binance P2P" / nombres completos en iOS
@@ -342,7 +350,7 @@ class DollarRow extends ConsumerWidget {
         ),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<CryptoPlatform>(
-            value: selectedPlatform,
+            value: effectivePlatform,
             isDense: true,
             isExpanded: true,
             icon: Icon(
@@ -360,7 +368,7 @@ class DollarRow extends ConsumerWidget {
               letterSpacing: 0.1,
             ),
             selectedItemBuilder: (BuildContext context) {
-              return CryptoPlatform.values.map((platform) {
+              return effectivePlatforms.map((platform) {
                 return Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -377,7 +385,7 @@ class DollarRow extends ConsumerWidget {
                 );
               }).toList();
             },
-            items: CryptoPlatform.values.map((platform) {
+            items: effectivePlatforms.map((platform) {
               return DropdownMenuItem<CryptoPlatform>(
                 value: platform,
                 child: Row(
@@ -410,11 +418,19 @@ class DollarRow extends ConsumerWidget {
 
   Widget _buildBankDropdown(BuildContext context, WidgetRef ref) {
     final selectedBank = ref.watch(selectedBankProvider);
-    final availableBanks = officialBanksFromBackend;
-    final effectiveBank = availableBanks.contains(selectedBank)
-        ? selectedBank
-        : availableBanks.first;
+    final availableBanks = ref.watch(banksWithDataProvider);
+    final effectiveBanks =
+        availableBanks.isNotEmpty ? availableBanks : [Bank.nacion];
+    final effectiveBank =
+        effectiveBanks.contains(selectedBank) ? selectedBank : effectiveBanks.first;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Si la selección actual no tiene datos, actualizar al primero disponible
+    if (effectiveBanks.isNotEmpty && !effectiveBanks.contains(selectedBank)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(selectedBankProvider.notifier).state = effectiveBanks.first;
+      });
+    }
 
     return SizedBox(
       width: 150, // Ancho para mostrar "Banco Nación" / nombres completos en iOS
@@ -453,7 +469,7 @@ class DollarRow extends ConsumerWidget {
               letterSpacing: 0.1,
             ),
             selectedItemBuilder: (BuildContext context) {
-              return availableBanks.map((bank) {
+              return effectiveBanks.map((bank) {
                 return Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -470,7 +486,7 @@ class DollarRow extends ConsumerWidget {
                 );
               }).toList();
             },
-            items: availableBanks.map((bank) {
+            items: effectiveBanks.map((bank) {
               return DropdownMenuItem<Bank>(
                 value: bank,
                 child: Row(

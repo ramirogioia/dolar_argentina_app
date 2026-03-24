@@ -75,11 +75,7 @@ flutter:
     - assets/icon/app_icon3.png
     - assets/icon/app_icon_final.png
     - assets/icon/app_icon_menu_final.png
-    - assets/platforms/binance_logo.png
-    - assets/platforms/kucoin_logo.png
-    - assets/platforms/bybit_logo.png
-    - assets/platforms/okx_logo.png
-    - assets/platforms/bitget_logo.png
+    - assets/platforms/
     - assets/banks/
 
 flutter_launcher_icons:

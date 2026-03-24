@@ -1,0 +1,24 @@
+# 🔐 Android Keystore Configuration
+# 
+# ⚠️ IMPORTANTE: Este es un archivo de EJEMPLO
+# 
+# Para usar:
+# 1. Copia este archivo: cp key.properties.example key.properties
+# 2. Reemplaza los valores con tus passwords reales
+# 3. NUNCA subas key.properties a Git (ya está en .gitignore)
+#
+# Ver: android/KEYSTORE_SETUP.md para instrucciones completas
+
+# Password del keystore (la que pusiste al crear el keystore)
+storePassword=TU_PASSWORD_DEL_KEYSTORE
+
+# Password de la key (puede ser la misma que storePassword)
+keyPassword=TU_PASSWORD_DE_LA_KEY
+
+# Alias de la key (el que usaste al crear el keystore, ej: "upload")
+keyAlias=upload
+
+# Ruta al archivo keystore (relativa a android/)
+storeFile=app/upload-keystore.jks
+
+

@@ -400,17 +400,28 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 }
 
-/// Selector de idioma: muestra "ES" o "EN" arriba a la izquierda; al tocar, opción para cambiar.
+/// Opciones de idioma: ES, EN (USA), IT, GER
 class _LanguageSelector extends ConsumerWidget {
   const _LanguageSelector();
 
   static const String _flagEs = '🇪🇸';
-  static const String _flagEn = '🇬🇧';
+  static const String _flagEn = '🇺🇸'; // USA
+  static const String _flagIt = '🇮🇹';
+  static const String _flagDe = '🇩🇪';
+
+  static const List<({String code, String flag, String label})> _options = [
+    (code: 'es', flag: _flagEs, label: 'ES'),
+    (code: 'en', flag: _flagEn, label: 'EN'),
+    (code: 'it', flag: _flagIt, label: 'IT'),
+    (code: 'de', flag: _flagDe, label: 'GER'),
+  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final current = ref.watch(localeProvider);
-    final label = (current == 'en') ? '$_flagEn EN' : '$_flagEs ES';
+    final currentOption =
+        _options.firstWhere((o) => o.code == current, orElse: () => _options.first);
+    final label = '${currentOption.flag} ${currentOption.label}';
 
     return Container(
       decoration: BoxDecoration(
@@ -452,30 +463,19 @@ class _LanguageSelector extends ConsumerWidget {
           ref.read(localeProvider.notifier).setLocale(value);
         },
         itemBuilder: (context) => [
-          PopupMenuItem(
-            value: 'es',
-            child: Text(
-              '$_flagEs ES',
-              style: TextStyle(
-                fontWeight: current != 'en' ? FontWeight.w600 : FontWeight.normal,
-                color: current != 'en'
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).textTheme.bodyMedium?.color,
+          for (final opt in _options)
+            PopupMenuItem(
+              value: opt.code,
+              child: Text(
+                '${opt.flag} ${opt.label}',
+                style: TextStyle(
+                  fontWeight: current == opt.code ? FontWeight.w600 : FontWeight.normal,
+                  color: current == opt.code
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).textTheme.bodyMedium?.color,
+                ),
               ),
             ),
-          ),
-          PopupMenuItem(
-            value: 'en',
-            child: Text(
-              '$_flagEn EN',
-              style: TextStyle(
-                fontWeight: current == 'en' ? FontWeight.w600 : FontWeight.normal,
-                color: current == 'en'
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).textTheme.bodyMedium?.color,
-              ),
-            ),
-          ),
         ],
       ),
     );

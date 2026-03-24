@@ -145,6 +145,8 @@ class DolarArgentinaApp extends ConsumerWidget {
       supportedLocales: const [
         Locale('es'),
         Locale('en'),
+        Locale('it'),
+        Locale('de'),
       ],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,

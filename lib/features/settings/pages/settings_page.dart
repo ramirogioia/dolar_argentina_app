@@ -137,14 +137,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                 color: Theme.of(context).colorScheme.primary,
               ),
               title: Text(
-                'Tipos de Dólar Visibles',
+                l10n.visibleDollarTypes,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
               ),
-              subtitle: const Text(
-                'Selecciona qué tipos de dólar quieres ver en la pantalla principal',
-                style: TextStyle(fontSize: 12),
+              subtitle: Text(
+                l10n.visibleDollarTypesSubtitle,
+                style: const TextStyle(fontSize: 12),
               ),
               children: [
                 Padding(
@@ -201,14 +201,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                 color: Theme.of(context).colorScheme.primary,
               ),
               title: Text(
-                'Contacto y Publicidad',
+                l10n.contactAndAds,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
               ),
-              subtitle: const Text(
-                'Por cualquier consulta o tema de publicidad podés escribirnos por correo',
-                style: TextStyle(fontSize: 12),
+              subtitle: Text(
+                l10n.contactAndAdsSubtitle,
+                style: const TextStyle(fontSize: 12),
               ),
               trailing: const Icon(Icons.open_in_new, size: 20),
               onTap: () => _openContactEmail(context),
@@ -222,7 +222,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                 color: Theme.of(context).colorScheme.primary,
               ),
               title: Text(
-                'Información de la App',
+                l10n.appInfo,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -235,35 +235,29 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                     children: [
                       _buildInfoSection(
                         context,
-                        'Funcionalidad',
-                        'Consultá en tiempo real las cotizaciones del dólar en Argentina: blue, oficial, cripto, tarjeta, MEP y CCL. Los valores se actualizan automáticamente para que siempre tengas la información al día.',
+                        l10n.functionalityTitle,
+                        l10n.functionalityContent,
                         Icons.currency_exchange,
                       ),
                       const SizedBox(height: 16),
                       _buildInfoSection(
                         context,
-                        'Marcadores de variación',
-                        'Cada tipo de dólar muestra cómo varió el precio respecto a las últimas 24 horas:\n\n'
-                            '• Verde ↗️: subió\n'
-                            '• Rojo ↘️: bajó\n'
-                            '• Gris ➖: sin cambio significativo',
+                        l10n.variationMarkersTitle,
+                        l10n.variationMarkersContent,
                         Icons.trending_up,
                       ),
                       const SizedBox(height: 16),
                       _buildInfoSection(
                         context,
-                        'Opciones disponibles',
-                        '• Dólar Oficial: elegí el banco para ver su cotización (Nación, BBVA, Provincia, etc.)\n'
-                            '• Dólar Cripto: elegí la plataforma P2P (Binance, KuCoin, Bybit, OKX, Bitget)\n'
-                            '• Personalización: reordená y ocultá tipos de dólar en Ajustes\n'
-                            '• Actualización: deslizá hacia abajo en la pantalla principal para refrescar',
+                        l10n.availableOptionsTitle,
+                        l10n.availableOptionsContent,
                         Icons.settings_applications,
                       ),
                       const SizedBox(height: 16),
                       _buildInfoSection(
                         context,
-                        'Fuentes de datos',
-                        'Las cotizaciones provienen directamente de las fuentes oficiales (bancos, entidades y plataformas verificadas). La información se actualiza de forma recurrente para que los valores mostrados reflejen el mercado real.',
+                        l10n.dataSourcesTitle,
+                        l10n.dataSourcesContent,
                         Icons.cloud_download,
                       ),
                     ],
@@ -280,14 +274,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                 color: Theme.of(context).colorScheme.primary,
               ),
               title: Text(
-                'Fuentes de Información',
+                l10n.informationSources,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
               ),
-              subtitle: const Text(
-                'Enlaces a las fuentes oficiales de los datos',
-                style: TextStyle(fontSize: 12),
+              subtitle: Text(
+                l10n.informationSourcesSubtitle,
+                style: const TextStyle(fontSize: 12),
               ),
               children: [
                 Padding(
@@ -297,7 +291,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                     children: [
                       _buildSourceSection(
                         context,
-                        'Dólar Oficial',
+                        l10n.officialDollar,
                         [
                           {
                             'nombre': 'Banco Nación',
@@ -342,7 +336,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                       const SizedBox(height: 24),
                       _buildSourceSection(
                         context,
-                        'Dólar Cripto',
+                        l10n.cryptoDollar,
                         [
                           {
                             'nombre': 'Binance',
@@ -390,10 +384,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
   static const String _contactEmail = 'info@giftera-store.com';
 
   Future<void> _openContactEmail(BuildContext context) async {
-    const subject = 'Contacto desde Dólar Argentina';
-    const body = 'Hola,\n\nLes escribo desde la app Dólar Argentina.\n\n'
-        '[Escriba aquí su consulta o tema de interés]\n\n'
-        'Saludos cordiales,';
+    final l10n = AppLocalizations.of(context);
+    final subject = l10n.contactEmailSubject;
+    final body = l10n.contactEmailBody;
     // Codificar con %20 para espacios (algunos clientes muestran + literal si usamos queryParameters)
     final query =
         'subject=${Uri.encodeComponent(subject)}&body=${Uri.encodeComponent(body)}';
@@ -409,11 +402,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
     }
 
     if (!opened && context.mounted) {
+      final l10n = AppLocalizations.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'No se pudo abrir el correo. Asegurate de tener una app de correo instalada (Gmail, Outlook, etc.). Podés escribir a $_contactEmail',
-          ),
+          content: Text(l10n.contactEmailError(_contactEmail)),
           duration: const Duration(seconds: 4),
         ),
       );
@@ -495,10 +487,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                   await launchUrl(url, mode: LaunchMode.externalApplication);
                 } else {
                   if (context.mounted) {
+                    final l10n = AppLocalizations.of(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(
-                            'No se pudo abrir el enlace: ${source['url']}'),
+                        content: Text(l10n.couldNotOpenLink(source['url']!)),
                       ),
                     );
                   }

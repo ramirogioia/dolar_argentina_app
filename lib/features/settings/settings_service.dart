@@ -10,8 +10,16 @@ class SettingsService {
   static const String _keyLocale = 'locale'; // 'es', 'en' o '' (sistema)
   static const String _defaultApiUrl =
       'https://raw.githubusercontent.com/ramirogioia/dolar_argentina_back/main/data';
-  static const bool _defaultDollarTypeVisible =
-      true; // Por defecto todos visibles
+  /// Por defecto: Blue, Oficial, Cripto y Tarjeta visibles; MEP y CCL ocultos.
+  /// Tarjeta es el 4.º más consultado (compras afuera, suscripciones, viajes).
+  static const Map<DollarType, bool> _defaultDollarTypeVisibility = {
+    DollarType.blue: true,
+    DollarType.official: true,
+    DollarType.crypto: true,
+    DollarType.tarjeta: true,
+    DollarType.mep: false,
+    DollarType.ccl: false,
+  };
   static const String _defaultThemeMode = 'light'; // Por defecto light mode
   static const bool _defaultNotificationsEnabled = true; // Por defecto activadas
 
@@ -40,7 +48,7 @@ class SettingsService {
   Future<bool> getDollarTypeVisibility(DollarType type) async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool('$_keyDollarTypeVisibility${type.name}') ??
-        _defaultDollarTypeVisible;
+        (_defaultDollarTypeVisibility[type] ?? true);
   }
 
   Future<void> setDollarTypeVisibility(DollarType type, bool visible) async {
@@ -55,7 +63,7 @@ class SettingsService {
     for (final type in DollarType.values) {
       visibility[type] =
           prefs.getBool('$_keyDollarTypeVisibility${type.name}') ??
-              _defaultDollarTypeVisible;
+              (_defaultDollarTypeVisibility[type] ?? true);
     }
 
     return visibility;

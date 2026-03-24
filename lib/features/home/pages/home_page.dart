@@ -24,6 +24,7 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   bool _updateChecked = false;
+  bool _reviewPromptScheduled = false;
 
   @override
   void initState() {
@@ -31,17 +32,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     // Verificar actualización inmediatamente cuando se monta el HomePage
     // Esto se ejecuta mientras el splash nativo todavía está visible
     _verificarActualizacion();
-    // Solicitar reseña tras engagement: varios días y sesiones de uso, en momento positivo
-    _maybeRequestReviewLater();
-  }
-
-  /// Pide reseña in-app si las condiciones de engagement se cumplen.
-  /// Basado en buenas prácticas: no al inicio, tras uso real, en momento positivo.
-  void _maybeRequestReviewLater() {
-    Future.delayed(const Duration(seconds: 5), () async {
-      if (!mounted) return;
-      await ReviewService.maybeRequestReview();
-    });
   }
 
   Future<void> _verificarActualizacion() async {
@@ -49,11 +39,27 @@ class _HomePageState extends ConsumerState<HomePage> {
     _updateChecked = true;
 
     try {
-      // Esperar un poco para que el splash nativo termine de mostrarse
-      await Future.delayed(const Duration(milliseconds: 300));
+      // Esperar a que el splash nativo termine y el apiUrl cargue (para backends custom)
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Derivar URL de versión desde apiUrl (si usan backend custom, se chequea ese)
+      final apiUrl = ref.read(apiUrlProvider);
+      final versionUrl = apiUrl.isNotEmpty
+          ? apiUrl.replaceFirst(RegExp(r'/data/?$'), '/versions/cotizaciones.json')
+          : null;
 
       print('🔍 [HOME] Iniciando verificación de actualización...');
-      final updateInfo = await VersionChecker.verificarActualizacion();
+      if (versionUrl != null) {
+        print('🔍 [HOME] URL versión (desde apiUrl): $versionUrl');
+      }
+      UpdateInfo? updateInfo = await VersionChecker.verificarActualizacion(versionUrl: versionUrl);
+
+      // Reintento si falló (ej. red lenta en arranque)
+      if (updateInfo == null && mounted) {
+        print('🔍 [HOME] Primera verificación falló, reintentando en 3s...');
+        await Future.delayed(const Duration(seconds: 3));
+        updateInfo = await VersionChecker.verificarActualizacion(versionUrl: versionUrl);
+      }
 
       print('🔍 [HOME] updateInfo recibido: ${updateInfo != null ? "NO NULL" : "NULL"}');
       if (updateInfo != null) {
@@ -66,11 +72,12 @@ class _HomePageState extends ConsumerState<HomePage> {
           mostrarDialogoForceUpdate(context, updateInfo);
         } else if (updateInfo.type == UpdateType.kind) {
           print('🔍 [HOME] KIND UPDATE detectado, mostrando diálogo...');
-          // Esperar un poco más para que la UI esté lista
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (mounted) {
-              mostrarDialogoKindUpdate(context, updateInfo);
-            }
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (mounted) {
+                mostrarDialogoKindUpdate(context, updateInfo!);
+              }
+            });
           });
         }
       }
@@ -84,6 +91,20 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   Widget build(BuildContext context) {
     final snapshotAsync = ref.watch(dollarSnapshotProvider);
+
+    // Reseña: cuando home ya tiene datos (4.ª apertura o ≥4 días instalada).
+    // ref.listen no notifica si el async ya venía en Data al suscribirse; por eso
+    // programamos aquí la primera vez que hay valor + post-frame.
+    if (snapshotAsync.hasValue && !_reviewPromptScheduled) {
+      _reviewPromptScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Future.delayed(const Duration(seconds: 2), () {
+          if (!mounted) return;
+          unawaited(ReviewService.showReviewDialogIfNeeded(context));
+        });
+      });
+    }
 
     return Scaffold(
       body: Stack(
@@ -287,7 +308,10 @@ class _HomePageState extends ConsumerState<HomePage> {
               SliverList(
                 delegate: SliverChildBuilderDelegate((context, index) {
                   final rate = visibleRates[index];
-                  return DollarRow(rate: rate);
+                  return DollarRow(
+                    rate: rate,
+                    lastMeasurementAt: snapshot.lastMeasurementAt,
+                  );
                 }, childCount: visibleRates.length),
               ),
               // Línea divisoria y texto informativo sobre las fuentes
@@ -416,12 +440,33 @@ class _LanguageSelector extends ConsumerWidget {
     (code: 'de', flag: _flagDe, label: 'GER'),
   ];
 
+  /// Idioma de UI soportado más cercano al [locale] del sistema (p. ej. en_US → en).
+  static String _languageCodeFromPlatform(Locale locale) {
+    final c = locale.languageCode.toLowerCase();
+    for (final o in _options) {
+      if (o.code == c) return c;
+    }
+    return 'es';
+  }
+
+  static ({String code, String flag, String label}) _optionForCode(String code) {
+    return _options.firstWhere((o) => o.code == code, orElse: () => _options.first);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final current = ref.watch(localeProvider);
-    final currentOption =
-        _options.firstWhere((o) => o.code == current, orElse: () => _options.first);
-    final label = '${currentOption.flag} ${currentOption.label}';
+    final l10n = AppLocalizations.of(context);
+    final platformLocale = Localizations.maybeLocaleOf(context) ??
+        View.of(context).platformDispatcher.locale;
+    // '' guardado = seguir dispositivo; antes el pill caía en ES por orElse aunque la UI era en inglés.
+    final effectiveCode = current.isEmpty
+        ? _languageCodeFromPlatform(platformLocale)
+        : current;
+    final displayOption = _optionForCode(effectiveCode);
+    final label = current.isEmpty
+        ? '🌐 ${displayOption.flag} ${displayOption.label}'
+        : '${displayOption.flag} ${displayOption.label}';
 
     return Container(
       decoration: BoxDecoration(
@@ -463,6 +508,19 @@ class _LanguageSelector extends ConsumerWidget {
           ref.read(localeProvider.notifier).setLocale(value);
         },
         itemBuilder: (context) => [
+          PopupMenuItem<String>(
+            value: '',
+            child: Text(
+              l10n.languageSystem,
+              style: TextStyle(
+                fontWeight: current.isEmpty ? FontWeight.w600 : FontWeight.normal,
+                color: current.isEmpty
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).textTheme.bodyMedium?.color,
+              ),
+            ),
+          ),
+          const PopupMenuDivider(),
           for (final opt in _options)
             PopupMenuItem(
               value: opt.code,

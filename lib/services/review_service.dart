@@ -1,33 +1,28 @@
+import 'package:flutter/material.dart';
 import 'package:in_app_review/in_app_review.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../app/router/app_router.dart';
+import '../l10n/app_localizations.dart';
 
-/// Servicio para solicitar reseñas in-app siguiendo buenas prácticas de UX.
+/// Reseñas: diálogo propio (mensaje cercano) + intento de flujo nativo o tienda.
 ///
-/// Basado en guías de Apple/Google:
-/// - Pedir después de engagement significativo (varias sesiones, varios días)
-/// - No interrumpir tareas
-/// - Respetar cuotas (iOS máx 3/año, Android tiene límites)
-/// - Momento positivo: cuando el usuario ve contenido útil
+/// Muestra si: 4.ª apertura **o** ≥4 días desde la primera apertura.
+/// Cooldown de 30 días tras cualquier cierre del diálogo (calificar, ahora no o fuera).
 class ReviewService {
   static const String _keyLaunchCount = 'review_launch_count';
   static const String _keyFirstLaunchDate = 'review_first_launch_date';
-  static const String _keyLastReviewRequestDate = 'review_last_request_date';
+  /// Última vez que se mostró / cerró el diálogo de reseña (cooldown)
+  static const String _keyLastReviewPromptDate = 'review_last_prompt_date_v2';
 
-  /// Mínimo de aperturas antes de considerar pedir reseña
   static const int minLaunchCount = 4;
+  static const int minDaysInstalled = 4;
+  static const int cooldownDays = 30;
 
-  /// Días desde primera apertura antes de pedir (evita molestar a usuarios nuevos)
-  static const int minDaysSinceFirstLaunch = 3;
-
-  /// Días mínimos entre solicitudes (Apple recomienda ~4 meses; usamos ~120 días)
-  static const int minDaysBetweenRequests = 120;
-
-  /// Apple App Store ID (App Store Connect → App Information → Apple ID)
   static const String _appStoreId = '6758462259';
 
   static final InAppReview _inAppReview = InAppReview.instance;
+  static bool _dialogInFlight = false;
 
-  /// Registra una apertura de la app. Llamar al iniciar (main.dart).
   static Future<void> recordLaunch() async {
     final prefs = await SharedPreferences.getInstance();
     final count = prefs.getInt(_keyLaunchCount) ?? 0;
@@ -41,58 +36,101 @@ class ReviewService {
     }
   }
 
-  /// Verifica si conviene pedir reseña y, si corresponde, muestra el diálogo nativo.
-  ///
-  /// Llamar en un momento positivo (ej. home con datos cargados, tras pull-to-refresh).
-  /// No bloquea ni interrumpe; solo muestra si las condiciones se cumplen.
-  static Future<void> maybeRequestReview() async {
-    if (!await _shouldAsk()) return;
-    if (!await _inAppReview.isAvailable()) return;
+  /// Muestra el diálogo si corresponde. Usar [navigatorKey.currentContext] vía router.
+  static Future<void> showReviewDialogIfNeeded(BuildContext? context) async {
+    if (_dialogInFlight) return;
+    if (!await _shouldShowPrompt()) return;
 
+    final ctx = navigatorKey.currentContext ?? context;
+    if (ctx == null || !ctx.mounted) return;
+
+    _dialogInFlight = true;
     try {
-      await _inAppReview.requestReview();
-      await _markRequested();
-    } catch (_) {
-      // Silenciar: el API tiene cuotas, puede fallar sin problema
+      final l10n = AppLocalizations.of(ctx);
+      final wantRate = await showDialog<bool>(
+        context: ctx,
+        useRootNavigator: true,
+        barrierDismissible: true,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(l10n.reviewDialogTitle),
+          content: Text(l10n.reviewDialogMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(l10n.reviewDialogLater),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(l10n.reviewDialogRate),
+            ),
+          ],
+        ),
+      );
+
+      await _markPromptCooldown();
+
+      if (wantRate == true) {
+        await _openReviewFlow();
+      }
+    } finally {
+      _dialogInFlight = false;
     }
   }
 
-  /// Abre la ficha de la app en la store (para botón "Calificar" en ajustes).
-  /// No tiene cuota; usar cuando el usuario lo pide explícitamente.
-  static Future<void> openStoreListing() async {
-    await _inAppReview.openStoreListing(appStoreId: _appStoreId);
+  static Future<void> _openReviewFlow() async {
+    try {
+      if (await _inAppReview.isAvailable()) {
+        await _inAppReview.requestReview();
+      } else {
+        await _inAppReview.openStoreListing(appStoreId: _appStoreId);
+      }
+    } catch (_) {
+      try {
+        await _inAppReview.openStoreListing(appStoreId: _appStoreId);
+      } catch (_) {}
+    }
   }
 
-  static Future<bool> _shouldAsk() async {
+  static Future<bool> _shouldShowPrompt() async {
     final prefs = await SharedPreferences.getInstance();
 
-    final launchCount = prefs.getInt(_keyLaunchCount) ?? 0;
-    if (launchCount < minLaunchCount) return false;
-
-    final firstLaunchStr = prefs.getString(_keyFirstLaunchDate);
-    if (firstLaunchStr == null) return false;
-    final firstLaunch = DateTime.tryParse(firstLaunchStr);
-    if (firstLaunch == null) return false;
-    final daysSinceFirst = DateTime.now().difference(firstLaunch).inDays;
-    if (daysSinceFirst < minDaysSinceFirstLaunch) return false;
-
-    final lastRequestStr = prefs.getString(_keyLastReviewRequestDate);
-    if (lastRequestStr != null) {
-      final lastRequest = DateTime.tryParse(lastRequestStr);
-      if (lastRequest != null) {
-        final daysSinceLast = DateTime.now().difference(lastRequest).inDays;
-        if (daysSinceLast < minDaysBetweenRequests) return false;
+    final lastStr = prefs.getString(_keyLastReviewPromptDate);
+    if (lastStr != null) {
+      final last = DateTime.tryParse(lastStr);
+      if (last != null) {
+        final days = DateTime.now().difference(last).inDays;
+        if (days < cooldownDays) return false;
       }
     }
 
-    return true;
+    final launchCount = prefs.getInt(_keyLaunchCount) ?? 0;
+    final firstStr = prefs.getString(_keyFirstLaunchDate);
+    if (firstStr == null) return false;
+    final first = DateTime.tryParse(firstStr);
+    if (first == null) return false;
+    final daysInstalled = DateTime.now().difference(first).inDays;
+
+    final fourthOpenOrMore = launchCount >= minLaunchCount;
+    final enoughDays = daysInstalled >= minDaysInstalled;
+
+    return fourthOpenOrMore || enoughDays;
   }
 
-  static Future<void> _markRequested() async {
+  static Future<void> _markPromptCooldown() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
-      _keyLastReviewRequestDate,
+      _keyLastReviewPromptDate,
       DateTime.now().toIso8601String(),
     );
+  }
+
+  /// Ajustes: primero intenta el popup nativo de estrellas; si no está disponible, abre la tienda.
+  static Future<void> requestReview() async {
+    await _openReviewFlow();
+  }
+
+  /// Abre la tienda directamente (fallback cuando requestReview no está disponible).
+  static Future<void> openStoreListing() async {
+    await _inAppReview.openStoreListing(appStoreId: _appStoreId);
   }
 }

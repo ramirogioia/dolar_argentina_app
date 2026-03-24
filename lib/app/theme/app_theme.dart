@@ -4,6 +4,9 @@ class AppTheme {
   // Colores modernos
   static const Color primaryBlue = Color(0xFF2196F3); // Azul moderno
   static const Color lightBlue = Color(0xFFD9EDF7); // Celeste verdoso
+  /// Borde superior de cards: tono suave que hace juego con el fondo celeste.
+  static const Color cardTopAccentBlue = Color(0xFF7AB5D6);
+  static const Color cardTopAccentBlueDark = Color(0xFF6B9BB3);
   static const Color softGreen = Color(0xFF4CAF50); // Verde suave
   static const Color softRed = Color(0xFFF44336); // Rojo suave
   static const Color backgroundGrey = Color(0xFFF5F5F5); // Gris de fondo suave

@@ -65,9 +65,19 @@ void main() {
       } catch (_) {}
     }
 
+    // Cargar locale ANTES de runApp para evitar primer frame en idioma del dispositivo
+    final prefs = await SharedPreferences.getInstance();
+    final savedLocale = prefs.getString('locale') ?? '';
+
     runApp(
-      const ProviderScope(
-        child: DolarArgentinaApp(),
+      ProviderScope(
+        overrides: [
+          localeProvider.overrideWith((ref) {
+            final service = ref.watch(settingsServiceProvider);
+            return LocaleNotifier.withInitial(service, savedLocale);
+          }),
+        ],
+        child: const DolarArgentinaApp(),
       ),
     );
 

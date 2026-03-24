@@ -75,6 +75,7 @@ flutter:
     - assets/icon/app_icon3.png
     - assets/icon/app_icon_final.png
     - assets/icon/app_icon_menu_final.png
+    - assets/calculator/bills_result_icon.png
     - assets/platforms/
     - assets/banks/
 

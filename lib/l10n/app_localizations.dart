@@ -568,6 +568,32 @@ class AppLocalizations {
     }
   }
 
+  String get conversionDirectionPesosToDollars {
+    switch (_lang) {
+      case 'en':
+        return 'Pesos → Dollars';
+      case 'it':
+        return 'Pesos → Dollari';
+      case 'de':
+        return 'Pesos → Dollar';
+      default:
+        return 'Pesos → Dólares';
+    }
+  }
+
+  String get conversionDirectionDollarsToPesos {
+    switch (_lang) {
+      case 'en':
+        return 'Dollars → Pesos';
+      case 'it':
+        return 'Dollari → Pesos';
+      case 'de':
+        return 'Dollar → Pesos';
+      default:
+        return 'Dólares → Pesos';
+    }
+  }
+
   String get calculatorSourceOfficial {
     switch (_lang) {
       case 'en':
@@ -911,6 +937,150 @@ class AppLocalizations {
         return 'Link konnte nicht geöffnet werden: $url';
       default:
         return 'No se pudo abrir el enlace: $url';
+    }
+  }
+
+  // Reseña in-app
+  String get reviewDialogTitle {
+    switch (_lang) {
+      case 'en':
+        return 'Enjoying Dolar ARG?';
+      case 'it':
+        return 'Ti piace Dolar ARG?';
+      case 'de':
+        return 'Gefällt dir Dolar ARG?';
+      default:
+        return '¿Te gusta Dolar ARG?';
+    }
+  }
+
+  String get reviewDialogMessage {
+    switch (_lang) {
+      case 'en':
+        return 'Dolar ARG is FREE. Your rating helps us a lot to keep improving.';
+      case 'it':
+        return 'Dolar ARG è GRATIS. La tua valutazione ci aiuta tantissimo a continuare a migliorare.';
+      case 'de':
+        return 'Dolar ARG ist KOSTENLOS. Deine Bewertung hilft uns sehr, besser zu werden.';
+      default:
+        return 'Dolar ARG es GRATIS. Tu puntuación nos ayuda muchísimo a seguir mejorando.';
+    }
+  }
+
+  String get reviewDialogRate {
+    switch (_lang) {
+      case 'en':
+        return 'Rate';
+      case 'it':
+        return 'Valuta';
+      case 'de':
+        return 'Bewerten';
+      default:
+        return 'Calificar';
+    }
+  }
+
+  String get reviewDialogLater {
+    switch (_lang) {
+      case 'en':
+        return 'Not now';
+      case 'it':
+        return 'Non ora';
+      case 'de':
+        return 'Später';
+      default:
+        return 'Ahora no';
+    }
+  }
+
+  String get rateUs {
+    switch (_lang) {
+      case 'en':
+        return 'Rate us';
+      case 'it':
+        return 'Valutaci';
+      case 'de':
+        return 'Bewerte uns';
+      default:
+        return 'Calificanos';
+    }
+  }
+
+  String get rateUsSubtitle {
+    switch (_lang) {
+      case 'en':
+        return 'Your opinion helps us a lot';
+      case 'it':
+        return 'La tua opinione ci aiuta molto';
+      case 'de':
+        return 'Deine Meinung hilft uns sehr';
+      default:
+        return 'Tu opinión nos ayuda mucho';
+    }
+  }
+
+  String get sectionAppearance {
+    switch (_lang) {
+      case 'en':
+        return 'Appearance';
+      case 'it':
+        return 'Aspetto';
+      case 'de':
+        return 'Darstellung';
+      default:
+        return 'Apariencia';
+    }
+  }
+
+  String get sectionNotifications {
+    switch (_lang) {
+      case 'en':
+        return 'Notifications';
+      case 'it':
+        return 'Notifiche';
+      case 'de':
+        return 'Benachrichtigungen';
+      default:
+        return 'Notificaciones';
+    }
+  }
+
+  String get sectionCustomization {
+    switch (_lang) {
+      case 'en':
+        return 'Customization';
+      case 'it':
+        return 'Personalizzazione';
+      case 'de':
+        return 'Anpassung';
+      default:
+        return 'Personalización';
+    }
+  }
+
+  String get sectionSupport {
+    switch (_lang) {
+      case 'en':
+        return 'Support';
+      case 'it':
+        return 'Supporto';
+      case 'de':
+        return 'Support';
+      default:
+        return 'Soporte';
+    }
+  }
+
+  String get sectionInformation {
+    switch (_lang) {
+      case 'en':
+        return 'Information';
+      case 'it':
+        return 'Informazioni';
+      case 'de':
+        return 'Informationen';
+      default:
+        return 'Información';
     }
   }
 }

@@ -111,7 +111,7 @@ final cryptoPlatformRatesProvider =
 
       final rates = Map<CryptoPlatform, DollarRate>.from(_emptyCryptoRates);
 
-r      // Mapear plataformas del JSON a enums (keys = nombres en backend)
+      // Mapear plataformas del JSON a enums (keys = nombres en backend)
       final platformMapping = {
         'binance': CryptoPlatform.binance,
         'kucoin': CryptoPlatform.kucoin,

@@ -47,15 +47,15 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<true/>
-	<key>UIViewControllerBasedStatusBarAppearance</key>
-	<false/>
-	<!-- Background Modes para notificaciones push -->
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-	</array>
-	<!-- AdMob App ID (real: necesario para TestFlight y App Store) -->
-	<key>GADApplicationIdentifier</key>
-	<string>ca-app-pub-6119092953994163~6222015453</string>
-</dict>
+		<key>UIViewControllerBasedStatusBarAppearance</key>
+		<false/>
+		<!-- Background Modes para notificaciones push -->
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>remote-notification</string>
+		</array>
+		<!-- AdMob App ID (real: necesario para TestFlight y App Store) -->
+		<key>GADApplicationIdentifier</key>
+		<string>ca-app-pub-6119092953994163~6222015453</string>
+	</dict>
 </plist>

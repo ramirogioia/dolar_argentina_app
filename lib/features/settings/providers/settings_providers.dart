@@ -224,6 +224,11 @@ class LocaleNotifier extends StateNotifier<String> {
     _load();
   }
 
+  /// Constructor con valor inicial (para arranque sin race: el idioma ya está cargado).
+  LocaleNotifier.withInitial(this._service, String initial) : super(initial) {
+    _initialized = true;
+  }
+
   Future<void> _load() async {
     if (_initialized) return;
     state = await _service.getLocale();

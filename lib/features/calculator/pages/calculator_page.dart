@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../../domain/models/dollar_type.dart';
 import '../../../domain/models/dollar_rate.dart';
 import '../../../domain/models/dollar_snapshot.dart';
@@ -9,6 +10,27 @@ import '../../../l10n/app_localizations.dart';
 import '../../../widgets/shimmer_top_bar.dart';
 import '../../home/providers/dollar_providers.dart';
 import '../../home/widgets/ad_banner.dart';
+
+/// Decimales siempre con coma; el teclado puede mandar punto → se muestra como coma.
+class _CalculatorDecimalInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text.replaceAll('.', ',');
+    if (text.isEmpty) {
+      return newValue.copyWith(text: text);
+    }
+    if (!RegExp(r'^\d*,?\d*$').hasMatch(text)) {
+      return oldValue;
+    }
+    return TextEditingValue(
+      text: text,
+      selection: newValue.selection,
+    );
+  }
+}
 
 class CalculatorPage extends ConsumerStatefulWidget {
   const CalculatorPage({super.key});
@@ -85,7 +107,13 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
   }
 
   void _applyAmount(double amount) {
-    _controller.text = amount.toStringAsFixed(amount.truncateToDouble() == amount ? 0 : 2);
+    final whole = amount.truncateToDouble() == amount;
+    if (whole) {
+      _controller.text = amount.toInt().toString();
+    } else {
+      _controller.text =
+          amount.toStringAsFixed(2).replaceFirst('.', ',');
+    }
     _calculate();
   }
 
@@ -102,20 +130,73 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
     return null;
   }
 
-  String _formatCurrency(double value, bool isDollar) {
-    if (isDollar) {
-      return 'USD ${value.toStringAsFixed(2).replaceAllMapped(
-        RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-        (Match m) => '${m[1]},',
-      )}';
-    } else {
-      final parts = value.toStringAsFixed(2).split('.');
-      final intPart = parts[0].replaceAllMapped(
-        RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-        (Match m) => '${m[1]}.',
-      );
-      return '\$$intPart,${parts[1]}';
+  /// Misma convención que [_buildMlAmountRichText], en un solo [String] (subtítulos).
+  String _formatMlAmountString(double value, {required bool isUsdOutput}) {
+    final cents = (value.abs() * 100).round();
+    final intPart = cents ~/ 100;
+    final decPart = (cents % 100).toString().padLeft(2, '0');
+    final intStr = NumberFormat('#,##0', 'es_AR').format(intPart);
+    if (isUsdOutput) {
+      return 'USD $intStr,$decPart';
     }
+    return '\$$intStr,$decPart';
+  }
+
+  /// Resultado / montos rápidos: miles con `.`, decimales con `,` y cifras decimales más chicas (estilo ML).
+  /// [showDecimals] en false para montos sugeridos enteros (sin `,00`).
+  Widget _buildMlAmountRichText(
+    BuildContext context, {
+    required double value,
+    required bool isUsdOutput,
+    required double baseFontSize,
+    required FontWeight fontWeight,
+    required Color color,
+    bool showDecimals = true,
+  }) {
+    final cents = (value.abs() * 100).round();
+    final intPart = cents ~/ 100;
+    final intStr = NumberFormat('#,##0', 'es_AR').format(intPart);
+
+    final baseStyle = TextStyle(
+      fontSize: baseFontSize,
+      fontWeight: fontWeight,
+      color: color,
+      letterSpacing: -0.35,
+    );
+
+    final prefix = isUsdOutput ? 'USD ' : '\$';
+
+    if (!showDecimals) {
+      return Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(text: prefix, style: baseStyle),
+            TextSpan(text: intStr, style: baseStyle),
+          ],
+        ),
+        textAlign: TextAlign.center,
+        maxLines: 1,
+      );
+    }
+
+    final decPart = (cents % 100).toString().padLeft(2, '0');
+    final decStyle = baseStyle.copyWith(
+      fontSize: baseFontSize * 0.58,
+      fontWeight: FontWeight.w700,
+    );
+
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: prefix, style: baseStyle),
+          TextSpan(text: intStr, style: baseStyle),
+          TextSpan(text: ',', style: baseStyle),
+          TextSpan(text: decPart, style: decStyle),
+        ],
+      ),
+      textAlign: TextAlign.center,
+      maxLines: 1,
+    );
   }
 
   void _showTypeSelector(BuildContext context) {
@@ -262,14 +343,14 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
                 alignment: Alignment.center,
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
-                  child: Text(
-                    _formatCurrency(amount.toDouble(), !_isPesosToDollar),
-                    maxLines: 1,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 11,
-                      color: isDark ? Colors.white : const Color(0xFF1565C0),
-                    ),
+                  child: _buildMlAmountRichText(
+                    context,
+                    value: amount.toDouble(),
+                    isUsdOutput: !_isPesosToDollar,
+                    baseFontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : const Color(0xFF1565C0),
+                    showDecimals: false,
                   ),
                 ),
               ),
@@ -474,8 +555,8 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
                                             const SizedBox(height: 2),
                                             Text(
                                               _isPesosToDollar
-                                                  ? '${_formatCurrency(displayRate, false)} = 1 USD'
-                                                  : '1 USD = ${_formatCurrency(displayRate, false)}',
+                                                  ? '${_formatMlAmountString(displayRate, isUsdOutput: false)} = 1 USD'
+                                                  : '1 USD = ${_formatMlAmountString(displayRate, isUsdOutput: false)}',
                                               style: TextStyle(
                                                 fontSize: 11,
                                                 fontStyle: FontStyle.italic,
@@ -565,8 +646,7 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
                                   const TextInputType.numberWithOptions(decimal: true),
                               textInputAction: TextInputAction.done,
                               inputFormatters: [
-                                FilteringTextInputFormatter.allow(
-                                    RegExp(r'^\d*\.?\d*')),
+                                _CalculatorDecimalInputFormatter(),
                               ],
                               style: TextStyle(
                                 fontSize: 24,
@@ -574,7 +654,7 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
                                 color: Theme.of(context).textTheme.bodyLarge?.color,
                               ),
                               decoration: InputDecoration(
-                                hintText: _isPesosToDollar ? '0' : '0.00',
+                                hintText: _isPesosToDollar ? '0' : '0,00',
                                 hintStyle: TextStyle(
                                   color: (isDark ? Colors.grey : Colors.grey.shade500),
                                   fontSize: 20,
@@ -666,18 +746,22 @@ class _CalculatorPageState extends ConsumerState<CalculatorPage> {
                                           textAlign: TextAlign.center,
                                         ),
                                         const SizedBox(height: 8),
-                                        Text(
-                                          _formatCurrency(
-                                              _result!, _isPesosToDollar),
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .headlineMedium
-                                              ?.copyWith(
-                                                fontWeight: FontWeight.w800,
-                                                color: AppTheme.primaryBlue,
-                                                letterSpacing: -0.5,
-                                              ),
-                                          textAlign: TextAlign.center,
+                                        Builder(
+                                          builder: (ctx) {
+                                            final fs = Theme.of(ctx)
+                                                    .textTheme
+                                                    .headlineMedium
+                                                    ?.fontSize ??
+                                                28;
+                                            return _buildMlAmountRichText(
+                                              ctx,
+                                              value: _result!,
+                                              isUsdOutput: _isPesosToDollar,
+                                              baseFontSize: fs,
+                                              fontWeight: FontWeight.w800,
+                                              color: AppTheme.primaryBlue,
+                                            );
+                                          },
                                         ),
                                       ],
                                     ),

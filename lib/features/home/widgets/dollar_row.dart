@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../app/utils/currency_formatter.dart';
@@ -10,12 +11,12 @@ import '../../../domain/models/dollar_rate.dart';
 import '../../../domain/models/dollar_type.dart';
 import '../../../l10n/app_localizations.dart';
 import '../providers/dollar_providers.dart';
+import '../../historicos/pages/historicos_page.dart' show HistoricalDollarType;
 
 class DollarRow extends ConsumerWidget {
   final DollarRate rate;
-  final DateTime? lastMeasurementAt;
 
-  const DollarRow({super.key, required this.rate, this.lastMeasurementAt});
+  const DollarRow({super.key, required this.rate});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -76,16 +77,20 @@ class DollarRow extends ConsumerWidget {
       displayRate = rate;
     }
 
-    // Si los datos son de un día anterior (ej. 8am sin corrida del día), mostrar 0%
-    final effectiveChangePercent = _isVariationStale(lastMeasurementAt)
-        ? 0.0
-        : displayRate.changePercent;
+    // Variación según el backend (vs día hábil o ayer en cripto). No forzar 0% por fecha de
+    // medición: si el timestamp es del día anterior pero el JSON es el vigente, el % sigue siendo válido.
+    final effectiveChangePercent = displayRate.changePercent;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
 
     final celesteTopLine =
         isDark ? AppTheme.cardTopAccentBlueDark : AppTheme.cardTopAccentBlue;
+
+    final topBarColor = _topBarColorForVariation(
+      effectiveChangePercent,
+      celesteFallback: celesteTopLine,
+    );
 
     final borderColor = isDark
         ? Colors.grey.shade700
@@ -126,7 +131,7 @@ class DollarRow extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _ShimmerTopBar(color: celesteTopLine, height: 4),
+            _ShimmerTopBar(color: topBarColor, height: 4),
             ColoredBox(
               color: Theme.of(context).cardColor,
               child: Stack(
@@ -156,11 +161,23 @@ class DollarRow extends ConsumerWidget {
                     const SizedBox(width: 8),
                     if (rate.type == DollarType.crypto)
                       Expanded(
-                        child: Center(child: _buildPlatformDropdown(context, ref)),
+                        child: Center(
+                          child: _buildPlatformDropdown(
+                            context,
+                            ref,
+                            accentColor: topBarColor,
+                          ),
+                        ),
                       )
                     else if (rate.type == DollarType.official)
                       Expanded(
-                        child: Center(child: _buildBankDropdown(context, ref)),
+                        child: Center(
+                          child: _buildBankDropdown(
+                            context,
+                            ref,
+                            accentColor: topBarColor,
+                          ),
+                        ),
                       )
                     else
                       const Spacer(),
@@ -180,6 +197,8 @@ class DollarRow extends ConsumerWidget {
                           context,
                           l10n.buy,
                           CurrencyFormatter.format(displayRate.buy),
+                          valueColor:
+                              _priceColorForVariation(effectiveChangePercent),
                         ),
                       )
                     else
@@ -192,6 +211,8 @@ class DollarRow extends ConsumerWidget {
                         context,
                         l10n.sell,
                         CurrencyFormatter.format(displayRate.sell),
+                        valueColor:
+                            _priceColorForVariation(effectiveChangePercent),
                       ),
                     ),
                     if (selectedBankForIcon != null) ...[
@@ -203,12 +224,46 @@ class DollarRow extends ConsumerWidget {
                       _buildPlatformLogo(context, selectedPlatformForIcon.logoPath, 40, 40),
                       const SizedBox(width: 8),
                     ],
-                    const SizedBox(width: 36), // espacio para el botón compartir
+                    // espacio para botón histórico + compartir (solo blue/oficial)
+                    SizedBox(
+                      width: (rate.type == DollarType.blue ||
+                              rate.type == DollarType.official)
+                          ? 72
+                          : 36,
+                    ),
                   ],
                 ),
               ],
             ),
                   ),
+                  // Botón histórico (solo blue y oficial): a la izquierda del compartir
+                  if (rate.type == DollarType.blue ||
+                      rate.type == DollarType.official)
+                    Positioned(
+                      bottom: 6,
+                      right: 42,
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.show_chart_rounded,
+                          size: 20,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withOpacity(0.8),
+                        ),
+                        style: IconButton.styleFrom(
+                          padding: const EdgeInsets.all(6),
+                          minimumSize: const Size(32, 32),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: () {
+                          final historicalType = rate.type == DollarType.blue
+                              ? HistoricalDollarType.blue
+                              : HistoricalDollarType.oficial;
+                          context.push('/historicos', extra: historicalType);
+                        },
+                      ),
+                    ),
                   // Botón compartir: borde inferior derecho
                   Positioned(
                     bottom: 6,
@@ -237,20 +292,6 @@ class DollarRow extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  /// true si los datos son de un día calendario anterior (medianoche pasó, sin corrida nueva).
-  static bool _isVariationStale(DateTime? lastMeasurementAt) {
-    if (lastMeasurementAt == null) return false;
-    final dataLocal = lastMeasurementAt.toLocal();
-    final dataDate =
-        DateTime(dataLocal.year, dataLocal.month, dataLocal.day);
-    final today = DateTime(
-      DateTime.now().year,
-      DateTime.now().month,
-      DateTime.now().day,
-    );
-    return dataDate.isBefore(today);
   }
 
   static String _formatShareNumber(double value, bool useComma) {
@@ -295,7 +336,39 @@ class DollarRow extends ConsumerWidget {
     Share.share(text);
   }
 
-  Widget _buildPriceSection(BuildContext context, String label, String value) {
+  /// Barra animada superior: celeste si no hay %; gris si ~0%; verde/rojo si sube/baja.
+  static Color _topBarColorForVariation(
+    double? changePercent, {
+    required Color celesteFallback,
+  }) {
+    if (changePercent == null) return celesteFallback;
+    final abs = changePercent.abs();
+    if (abs < 0.01) return AppTheme.variationNeutral;
+    if (changePercent > 0.01) return AppTheme.softGreen;
+    return AppTheme.softRed;
+  }
+
+  /// Mismos criterios que [_buildChangeIndicator] (`AppTheme`).
+  static Color? _priceColorForVariation(double? changePercent) {
+    if (changePercent == null) return null;
+    final abs = changePercent.abs();
+    if (abs < 0.01) return AppTheme.variationNeutral;
+    if (changePercent > 0.01) return AppTheme.softGreen;
+    return AppTheme.softRed;
+  }
+
+  Widget _buildPriceSection(
+    BuildContext context,
+    String label,
+    String value, {
+    Color? valueColor,
+  }) {
+    final base = Theme.of(context).textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w800,
+          fontSize: 24,
+          letterSpacing: -0.8,
+          height: 1.1,
+        );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -315,12 +388,8 @@ class DollarRow extends ConsumerWidget {
             alignment: Alignment.centerLeft,
             child: Text(
               value,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 24,
-                    letterSpacing: -0.8,
-                    height: 1.1,
-                  ),
+              style:
+                  valueColor != null ? base?.copyWith(color: valueColor) : base,
               maxLines: 1,
             ),
           ),
@@ -336,10 +405,10 @@ class DollarRow extends ConsumerWidget {
     final isPositive = changePercent > 0.01;
 
     final color = isNeutral
-        ? Colors.grey // Gris para sin variación
+        ? AppTheme.variationNeutral
         : isPositive
-            ? const Color(0xFF4CAF50) // Verde suave para positivo
-            : const Color(0xFFF44336); // Rojo suave para negativo
+            ? AppTheme.softGreen
+            : AppTheme.softRed;
 
     IconData icon;
     if (isNeutral) {
@@ -380,7 +449,11 @@ class DollarRow extends ConsumerWidget {
     );
   }
 
-  Widget _buildPlatformDropdown(BuildContext context, WidgetRef ref) {
+  Widget _buildPlatformDropdown(
+    BuildContext context,
+    WidgetRef ref, {
+    required Color accentColor,
+  }) {
     final selectedPlatform = ref.watch(selectedCryptoPlatformProvider);
     final availablePlatforms = ref.watch(platformsWithDataProvider);
     final effectivePlatforms = availablePlatforms.isNotEmpty
@@ -405,6 +478,7 @@ class DollarRow extends ConsumerWidget {
       constraints: const BoxConstraints(maxWidth: 150),
       child: _SelectorTrigger(
         isDark: isDark,
+        accentColor: accentColor,
         icon: _buildPlatformLogo(context, effectivePlatform.logoPath, 14, 14),
         label: effectivePlatform.displayName,
         onTap: () => _showPlatformSelector(
@@ -512,7 +586,11 @@ class DollarRow extends ConsumerWidget {
     );
   }
 
-  Widget _buildBankDropdown(BuildContext context, WidgetRef ref) {
+  Widget _buildBankDropdown(
+    BuildContext context,
+    WidgetRef ref, {
+    required Color accentColor,
+  }) {
     final selectedBank = ref.watch(selectedBankProvider);
     final availableBanks = ref.watch(banksWithDataProvider);
     final effectiveBanks =
@@ -532,6 +610,7 @@ class DollarRow extends ConsumerWidget {
       constraints: const BoxConstraints(maxWidth: 150),
       child: _SelectorTrigger(
         isDark: isDark,
+        accentColor: accentColor,
         icon: _buildBankLogo(context, effectiveBank.logoPath, 14, 14),
         label: effectiveBank.displayName,
         onTap: () => _showBankSelector(
@@ -681,12 +760,15 @@ class DollarRow extends ConsumerWidget {
 /// Botón que abre el selector en modal bottom sheet (misma apariencia que antes).
 class _SelectorTrigger extends StatelessWidget {
   final bool isDark;
+  /// Misma lógica que la barra superior: celeste / gris / verde / rojo según variación.
+  final Color accentColor;
   final Widget icon;
   final String label;
   final VoidCallback onTap;
 
   const _SelectorTrigger({
     required this.isDark,
+    required this.accentColor,
     required this.icon,
     required this.label,
     required this.onTap,
@@ -706,9 +788,7 @@ class _SelectorTrigger extends StatelessWidget {
                 : Colors.white.withOpacity(0.7),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isDark
-                  ? const Color(0xFF3C3C3C).withOpacity(0.5)
-                  : const Color(0xFFE3F2FD).withOpacity(0.8),
+              color: accentColor.withOpacity(isDark ? 0.5 : 0.4),
               width: 1,
             ),
           ),
@@ -718,9 +798,7 @@ class _SelectorTrigger extends StatelessWidget {
               Container(
                 height: 1.5,
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? AppTheme.cardTopAccentBlueDark.withOpacity(0.9)
-                      : AppTheme.cardTopAccentBlue.withOpacity(0.9),
+                  color: accentColor.withOpacity(0.92),
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
                 ),
               ),
@@ -746,9 +824,7 @@ class _SelectorTrigger extends StatelessWidget {
                     Icon(
                       Icons.keyboard_arrow_down_rounded,
                       size: 18,
-                      color: isDark
-                          ? Colors.grey[300]
-                          : const Color(0xFF2196F3).withOpacity(0.7),
+                      color: accentColor.withOpacity(isDark ? 0.9 : 0.85),
                     ),
                   ],
                 ),

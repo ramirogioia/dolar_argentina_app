@@ -1,9 +1,9 @@
 import 'dollar_rate.dart';
 
 class DollarSnapshot {
-  /// Cuándo se refrescaron los datos en la app (pull to refresh / fetch).
+  /// Momento en que terminó la consulta en el cliente (header, refresh manual).
   final DateTime updatedAt;
-  /// Timestamp de la última medición del backend (para mostrar "Última actualización: ...").
+  /// Momento de la medición en el backend (solo lógica interna, ej. variación stale en cards).
   final DateTime? lastMeasurementAt;
   final List<DollarRate> rates;
 

@@ -35,55 +35,34 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Future<void> _verificarActualizacion() async {
-    if (_updateChecked) return; // Evitar múltiples verificaciones
+    if (_updateChecked) return;
     _updateChecked = true;
 
     try {
-      // Esperar a que el splash nativo termine y el apiUrl cargue (para backends custom)
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Esperar 3s para que la app esté completamente cargada antes del check
+      await Future.delayed(const Duration(seconds: 3));
 
-      // Derivar URL de versión desde apiUrl (si usan backend custom, se chequea ese)
-      final apiUrl = ref.read(apiUrlProvider);
-      final versionUrl = apiUrl.isNotEmpty
-          ? apiUrl.replaceFirst(RegExp(r'/data/?$'), '/versions/cotizaciones.json')
-          : null;
+      UpdateInfo? updateInfo = await VersionChecker.verificarActualizacion();
 
-      print('🔍 [HOME] Iniciando verificación de actualización...');
-      if (versionUrl != null) {
-        print('🔍 [HOME] URL versión (desde apiUrl): $versionUrl');
-      }
-      UpdateInfo? updateInfo = await VersionChecker.verificarActualizacion(versionUrl: versionUrl);
-
-      // Reintento si falló (ej. red lenta en arranque)
+      // Reintento si falló (red lenta en arranque)
       if (updateInfo == null && mounted) {
-        print('🔍 [HOME] Primera verificación falló, reintentando en 3s...');
-        await Future.delayed(const Duration(seconds: 3));
-        updateInfo = await VersionChecker.verificarActualizacion(versionUrl: versionUrl);
+        await Future.delayed(const Duration(seconds: 5));
+        updateInfo = await VersionChecker.verificarActualizacion();
       }
 
-      print('🔍 [HOME] updateInfo recibido: ${updateInfo != null ? "NO NULL" : "NULL"}');
-      if (updateInfo != null) {
-        print('🔍 [HOME] Tipo de actualización: ${updateInfo.type}');
-      }
+      if (!mounted || updateInfo == null) return;
 
-      if (mounted && updateInfo != null) {
-        if (updateInfo.type == UpdateType.force) {
-          print('🔍 [HOME] Mostrando FORCE UPDATE');
-          mostrarDialogoForceUpdate(context, updateInfo);
-        } else if (updateInfo.type == UpdateType.kind) {
-          print('🔍 [HOME] KIND UPDATE detectado, mostrando diálogo...');
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            Future.delayed(const Duration(milliseconds: 500), () {
-              if (mounted) {
-                mostrarDialogoKindUpdate(context, updateInfo!);
-              }
-            });
-          });
-        }
+      final info = updateInfo;
+      if (info.type == UpdateType.force) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) mostrarDialogoForceUpdate(context, info);
+        });
+      } else if (info.type == UpdateType.kind) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) mostrarDialogoKindUpdate(context, info);
+        });
       }
-    } catch (e, stackTrace) {
-      print('❌ [HOME] Error verificando actualización: $e');
-      print('❌ [HOME] Stack trace: $stackTrace');
+    } catch (_) {
       // En caso de error, NO bloquear la app
     }
   }
@@ -91,6 +70,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   Widget build(BuildContext context) {
     final snapshotAsync = ref.watch(dollarSnapshotProvider);
+    final l10n = AppLocalizations.of(context);
 
     // Reseña: cuando home ya tiene datos (4.ª apertura o ≥4 días instalada).
     // ref.listen no notifica si el async ya venía en Data al suscribirse; por eso
@@ -116,6 +96,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 await Future.wait([
                   ref.refresh(dollarSnapshotProvider.future),
                   ref.refresh(fullJsonDataProvider.future),
+                  ref.refresh(appLinksVariablesProvider.future),
                 ]);
               },
               color: AppTheme.primaryBlue,
@@ -132,64 +113,14 @@ class _HomePageState extends ConsumerState<HomePage> {
             left: 8,
             child: const _LanguageSelector(),
           ),
-          // Pill vertical con botones flotantes en la esquina superior derecha
+          // Pill mismo estilo que idioma: colapsado muestra menú; al tocar, Históricos / Calculadora / Configuración
           Positioned(
             top: MediaQuery.of(context).padding.top + 8,
             right: 8,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? const Color(0xFF2C2C2C).withOpacity(0.9)
-                    : Colors.white.withOpacity(0.95),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? const Color(0xFF3C3C3C)
-                      : Colors.grey.shade300,
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      Icons.settings,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 24,
-                    ),
-                    onPressed: () => context.push('/settings'),
-                    padding: const EdgeInsets.all(8),
-                    constraints: const BoxConstraints(),
-                  ),
-                  Container(
-                    width: 24,
-                    height: 1,
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.grey.shade700
-                        : Colors.grey.shade300,
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.calculate_outlined,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 24,
-                    ),
-                    onPressed: () => context.push('/calculator'),
-                    padding: const EdgeInsets.all(8),
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
+            child: _ToolsMenuPill(
+              historicosLabel: l10n.historicos,
+              calculatorLabel: l10n.calculator,
+              settingsLabel: l10n.settings,
             ),
           ),
         ],
@@ -301,7 +232,8 @@ class _HomePageState extends ConsumerState<HomePage> {
               SliverToBoxAdapter(
                 child: HomeHeader(
                   updatedAt: snapshot.updatedAt,
-                  lastMeasurementAt: snapshot.lastMeasurementAt,
+                  appLinks:
+                      ref.watch(appLinksVariablesProvider).valueOrNull,
                 ),
               ),
               // Lista de cards con scroll (solo los visibles)
@@ -310,7 +242,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                   final rate = visibleRates[index];
                   return DollarRow(
                     rate: rate,
-                    lastMeasurementAt: snapshot.lastMeasurementAt,
                   );
                 }, childCount: visibleRates.length),
               ),
@@ -420,6 +351,100 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Mismo estilo que [_LanguageSelector]: pill horizontal; al tocar se despliega el menú.
+class _ToolsMenuPill extends StatelessWidget {
+  final String historicosLabel;
+  final String calculatorLabel;
+  final String settingsLabel;
+
+  const _ToolsMenuPill({
+    required this.historicosLabel,
+    required this.calculatorLabel,
+    required this.settingsLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF2C2C2C).withOpacity(0.9)
+            : Colors.white.withOpacity(0.95),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF3C3C3C)
+              : Colors.grey.shade300,
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: PopupMenuButton<String>(
+        tooltip: '',
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        offset: const Offset(0, 40),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Icon(
+            Icons.menu_rounded,
+            size: 22,
+            color: primary,
+          ),
+        ),
+        onSelected: (value) {
+          if (value == 'historicos') {
+            context.push('/historicos');
+          } else if (value == 'calculator') {
+            context.push('/calculator');
+          } else if (value == 'settings') {
+            context.push('/settings');
+          }
+        },
+        itemBuilder: (context) => [
+          PopupMenuItem<String>(
+            value: 'historicos',
+            child: Row(
+              children: [
+                Icon(Icons.show_chart_rounded, size: 20, color: primary),
+                const SizedBox(width: 12),
+                Text(historicosLabel),
+              ],
+            ),
+          ),
+          PopupMenuItem<String>(
+            value: 'calculator',
+            child: Row(
+              children: [
+                Icon(Icons.calculate_outlined, size: 20, color: primary),
+                const SizedBox(width: 12),
+                Text(calculatorLabel),
+              ],
+            ),
+          ),
+          PopupMenuItem<String>(
+            value: 'settings',
+            child: Row(
+              children: [
+                Icon(Icons.settings_outlined, size: 20, color: primary),
+                const SizedBox(width: 12),
+                Text(settingsLabel),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

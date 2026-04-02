@@ -11,6 +11,7 @@ import '../../../l10n/app_localizations.dart';
 import '../providers/settings_providers.dart';
 import '../../../services/fcm_service.dart';
 import '../../../services/review_service.dart';
+import '../../home/widgets/ad_banner.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -60,9 +61,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
         title: Text(l10n.settings),
         elevation: 0,
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
+      body: Stack(
         children: [
+          Positioned.fill(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+              children: [
           _buildSectionHeader(l10n.sectionAppearance),
           const SizedBox(height: 8),
           _SettingsCard(
@@ -312,7 +316,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
               ),
             ),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
           FutureBuilder<PackageInfo>(
             future: PackageInfo.fromPlatform(),
             builder: (context, snapshot) {
@@ -334,6 +338,39 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                 ),
               );
             },
+          ),
+          // Espacio para el banner fijo (misma lógica que Home)
+          Builder(
+            builder: (context) {
+              final isTablet = MediaQuery.of(context).size.shortestSide >= 600;
+              final bannerHeight = isTablet ? 90.0 : 100.0;
+              return SizedBox(height: bannerHeight + 16 + 8);
+            },
+          ),
+        ],
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  height: 8,
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                ),
+                Container(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  child: AdBanner(
+                    customAdUnitId: Platform.isIOS
+                        ? adMobSettingsBannerUnitIdIos
+                        : adMobSettingsBannerUnitIdAndroid,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

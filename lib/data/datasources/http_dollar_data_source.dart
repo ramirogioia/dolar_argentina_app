@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../app/constants/api_constants.dart';
+import '../../core/cotizacion_calendar.dart';
 import '../../domain/models/dollar_rate.dart';
 import '../../domain/models/dollar_snapshot.dart';
 import '../../domain/models/dollar_type.dart';
@@ -194,19 +195,6 @@ class HttpDollarDataSource implements DollarDataSource {
     }
   }
 
-  /// Fecha del último día de mercado anterior a [referenceDate].
-  /// Lunes → viernes. Sábado/domingo (datos del viernes) → jueves. Martes a viernes → día anterior.
-  static DateTime _getPreviousMarketDate(DateTime referenceDate) {
-    final w = referenceDate.weekday; // 1=Mon, 7=Sun
-    if (w == DateTime.monday)
-      return referenceDate.subtract(const Duration(days: 3)); // Viernes
-    if (w == DateTime.saturday)
-      return referenceDate.subtract(const Duration(days: 2)); // Jueves
-    if (w == DateTime.sunday)
-      return referenceDate.subtract(const Duration(days: 3)); // Jueves
-    return referenceDate.subtract(const Duration(days: 1));
-  }
-
   /// Indica si [ultimaCorrida] tiene al menos un valor usable (compra o venta numérico).
   /// Útil cuando la primera corrida del día vino con null (scrape falló).
   static bool _hasUsableDataInUltimaCorrida(
@@ -337,10 +325,6 @@ class HttpDollarDataSource implements DollarDataSource {
 
       final json = jsonDecode(jsonString) as Map<String, dynamic>;
 
-      // Usar la fecha/hora actual (cuándo se hizo el fetch desde el frontend)
-      // en lugar de la fecha del backend, para que el usuario sepa cuándo actualizó él los datos
-      final updatedAt = DateTime.now();
-
       // Obtener la última corrida (valores más recientes)
       final fechaArchivo = json['fecha'] as String?;
       print('📅 DEBUG - Fecha del archivo cargado: $fechaArchivo');
@@ -350,8 +334,7 @@ class HttpDollarDataSource implements DollarDataSource {
       }
       print(
           '📅 DEBUG - ultima_corrida timestamp: ${ultimaCorrida['timestamp']}');
-      // "Última actualización: ..." debe mostrar el dato del backend (ultima_actualizacion).
-      // Si no existe, usar el timestamp de la última corrida del array.
+      // Momento en que el backend generó la medición (para variación "stale" en cards, no para el header).
       DateTime? lastMeasurementAt;
       final ultimaActualizacion = json['ultima_actualizacion'];
       if (ultimaActualizacion != null) {
@@ -368,33 +351,40 @@ class HttpDollarDataSource implements DollarDataSource {
         lastMeasurementAt = _parseTimestamp(ultimaCorrida['timestamp']);
       }
 
-      // Fecha de referencia: la del JSON que estamos mostrando (para lógica fin de semana)
-      DateTime referenceDate = DateTime.now();
-      if (fechaArchivo != null) {
-        try {
-          referenceDate = DateTime.parse(fechaArchivo);
-        } catch (_) {}
-      }
-      final previousMarketDate = _getPreviousMarketDate(referenceDate);
+      // Fecha de referencia: calendario del JSON (no DateTime.parse ISO que desalinea el día).
+      final referenceDate = parseCotizacionFechaString(fechaArchivo);
 
-      // Última corrida de AYER (calendario): para blue y cripto (operan todos los días)
+      // Cripto: último cierre disponible del día calendario anterior (si falta el JSON, retroceder).
       Map<String, dynamic>? ultimaCorridaAyer;
-      final yesterday = referenceDate.subtract(const Duration(days: 1));
-      final yesterdayStr =
-          '${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}';
-      ultimaCorridaAyer =
-          await _fetchUltimaCorridaForDate(baseUrl, yesterdayStr, 'ayer');
+      String? ultimaCorridaAyerDateStr;
+      for (var i = 1; i <= 7; i++) {
+        final day = referenceDate.subtract(Duration(days: i));
+        final ds = formatCotizacionDate(day);
+        final u =
+            await _fetchUltimaCorridaForDate(baseUrl, ds, 'ayer (-$i días)');
+        if (u != null) {
+          ultimaCorridaAyer = u;
+          ultimaCorridaAyerDateStr = ds;
+          break;
+        }
+      }
 
-      // Última corrida del ÚLTIMO DÍA DE MERCADO (para oficial, MEP, CCL, tarjeta: no operan sábado/domingo)
-      // Sábado/domingo: comparar con jueves (variación = cierre viernes vs jueves). Lunes: comparar con viernes.
+      // Oficial / blue / etc.: último día hábil anterior; si no hay archivo, seguir retrocediendo.
       Map<String, dynamic>? ultimaCorridaPrevMarket;
-      final prevMarketStr =
-          '${previousMarketDate.year}-${previousMarketDate.month.toString().padLeft(2, '0')}-${previousMarketDate.day.toString().padLeft(2, '0')}';
-      if (prevMarketStr != yesterdayStr) {
-        ultimaCorridaPrevMarket = await _fetchUltimaCorridaForDate(
-            baseUrl, prevMarketStr, 'día hábil anterior');
-      } else {
-        ultimaCorridaPrevMarket = ultimaCorridaAyer;
+      var cursor = getPreviousMarketDate(referenceDate);
+      for (var attempt = 0; attempt < 8; attempt++) {
+        final prevStr = formatCotizacionDate(cursor);
+        if (ultimaCorridaAyer != null && ultimaCorridaAyerDateStr == prevStr) {
+          ultimaCorridaPrevMarket = ultimaCorridaAyer;
+          break;
+        }
+        final p = await _fetchUltimaCorridaForDate(
+            baseUrl, prevStr, 'día hábil anterior');
+        if (p != null) {
+          ultimaCorridaPrevMarket = p;
+          break;
+        }
+        cursor = getPreviousMarketDate(cursor);
       }
 
       // Obtener el array de corridas para búsqueda hacia atrás cuando hay valores null
@@ -406,8 +396,8 @@ class HttpDollarDataSource implements DollarDataSource {
       final rates = <DollarRate>[];
 
       // Mapear cada tipo de dólar
-      // Oficial, MEP, CCL, tarjeta: comparar con último día hábil (fin de semana no operan)
-      // Blue, cripto: comparar con ayer calendario
+      // Oficial, blue, MEP, CCL, tarjeta: variación vs último día hábil
+      // Cripto: variación vs día calendario anterior
       for (final dollarType in DollarType.values) {
         final rate = _extractDollarRate(
           ultimaCorrida,
@@ -421,6 +411,9 @@ class HttpDollarDataSource implements DollarDataSource {
           rates.add(rate);
         }
       }
+
+      // Momento en que esta consulta terminó en el cliente (header "Refrescado" / "Última actualización").
+      final updatedAt = DateTime.now();
 
       final snapshot = DollarSnapshot(
         updatedAt: updatedAt,
@@ -489,8 +482,8 @@ class HttpDollarDataSource implements DollarDataSource {
   }
 
   /// Extrae un DollarRate para un tipo específico de dólar
-  /// [ultimaCorridaAyer] comparación para blue y cripto (ayer calendario)
-  /// [ultimaCorridaPrevMarket] comparación para oficial, MEP, CCL, tarjeta (último día hábil)
+  /// [ultimaCorridaAyer] comparación para cripto (día calendario anterior)
+  /// [ultimaCorridaPrevMarket] comparación para oficial, blue, MEP, CCL, tarjeta (último día hábil)
   DollarRate? _extractDollarRate(
     Map<String, dynamic> ultimaCorrida,
     Map<String, dynamic>? ultimaCorridaAyer,
@@ -769,14 +762,20 @@ class HttpDollarDataSource implements DollarDataSource {
         }
       }
 
-      // Variación: blue con ayer; tarjeta, MEP, CCL con último día hábil (no operan fin de semana)
-      final comparisonRest = (dollarType == DollarType.blue)
-          ? ultimaCorridaAyer
-          : (ultimaCorridaPrevMarket ?? ultimaCorridaAyer);
+      // Variación: blue, tarjeta, MEP, CCL vs último día hábil (lunes vs viernes)
+      final comparisonRest = ultimaCorridaPrevMarket ?? ultimaCorridaAyer;
       if (comparisonRest != null) {
         final previousData = comparisonRest[typeKey] as Map<String, dynamic>?;
         if (previousData != null) {
-          if (dollarType == DollarType.tarjeta && buy == null && sell != null) {
+          // Blue: misma base que tweets/notificaciones de cierre (post_tweets.py usa venta).
+          if (dollarType == DollarType.blue && sell != null) {
+            final previousSell = _parseDouble(previousData['venta']);
+            if (previousSell != null && previousSell > 0) {
+              changePercent = ((sell - previousSell) / previousSell) * 100;
+            }
+          } else if (dollarType == DollarType.tarjeta &&
+              buy == null &&
+              sell != null) {
             final previousSell = _parseDouble(previousData['venta']);
             if (previousSell != null && previousSell > 0) {
               changePercent = ((sell - previousSell) / previousSell) * 100;

@@ -4,6 +4,22 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+/// Unidad AdMob — banner pantalla Configuración (iOS).
+const String adMobSettingsBannerUnitIdIos =
+    'ca-app-pub-6119092953994163/6477257551';
+
+/// Unidad AdMob — banner pantalla Configuración (Android).
+const String adMobSettingsBannerUnitIdAndroid =
+    'ca-app-pub-6119092953994163/1224930870';
+
+/// Unidad AdMob — banner pantalla Históricos (iOS).
+const String adMobHistoricosBannerUnitIdIos =
+    'ca-app-pub-6119092953994163/5116908574';
+
+/// Unidad AdMob — banner pantalla Históricos (Android).
+const String adMobHistoricosBannerUnitIdAndroid =
+    'ca-app-pub-6119092953994163/8864581892';
+
 /// Widget para mostrar un banner de AdMob
 class AdBanner extends StatefulWidget {
   /// Ad Unit ID personalizado (opcional). Si no se provee, usa el ID por defecto.

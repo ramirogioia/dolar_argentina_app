@@ -280,6 +280,32 @@ class AppLocalizations {
     }
   }
 
+  String get linkTwitterLabel {
+    switch (_lang) {
+      case 'en':
+        return 'Twitter / X';
+      case 'it':
+        return 'Twitter / X';
+      case 'de':
+        return 'Twitter / X';
+      default:
+        return 'Twitter / X';
+    }
+  }
+
+  String get linkWebLabel {
+    switch (_lang) {
+      case 'en':
+        return 'Web';
+      case 'it':
+        return 'Sito web';
+      case 'de':
+        return 'Web';
+      default:
+        return 'Web';
+    }
+  }
+
   String dollarTypeName(DollarType type) {
     switch (_lang) {
       case 'en':
@@ -1081,6 +1107,135 @@ class AppLocalizations {
         return 'Informationen';
       default:
         return 'Información';
+    }
+  }
+
+  // Historicos
+  String get historicos {
+    switch (_lang) {
+      case 'en':
+        return 'Historical';
+      case 'it':
+        return 'Storico';
+      case 'de':
+        return 'Verlauf';
+      default:
+        return 'Históricos';
+    }
+  }
+
+  String get historicosBlue {
+    switch (_lang) {
+      case 'en':
+        return 'Blue Dollar';
+      case 'it':
+        return 'Dollaro Blue';
+      case 'de':
+        return 'Blauer Dollar';
+      default:
+        return 'Dólar Blue';
+    }
+  }
+
+  String get historicosOficial {
+    switch (_lang) {
+      case 'en':
+        return 'Official Dollar';
+      case 'it':
+        return 'Dollaro Ufficiale';
+      case 'de':
+        return 'Offizieller Dollar';
+      default:
+        return 'Dólar Oficial';
+    }
+  }
+
+  String get historicosChangeLabel {
+    switch (_lang) {
+      case 'en':
+        return 'Period change';
+      case 'it':
+        return 'Variazione periodo';
+      case 'de':
+        return 'Periodenänderung';
+      default:
+        return 'Cambio del período';
+    }
+  }
+
+  String get historicosNoData {
+    switch (_lang) {
+      case 'en':
+        return 'No data for this period';
+      case 'it':
+        return 'Nessun dato per questo periodo';
+      case 'de':
+        return 'Keine Daten für diesen Zeitraum';
+      default:
+        return 'Sin datos para este período';
+    }
+  }
+
+  // Rangos de tiempo
+  String get range7d {
+    switch (_lang) {
+      case 'en':
+        return '7D';
+      default:
+        return '7D';
+    }
+  }
+
+  String get range1m {
+    switch (_lang) {
+      case 'en':
+        return '1M';
+      default:
+        return '1M';
+    }
+  }
+
+  String get range3m {
+    switch (_lang) {
+      case 'en':
+        return '3M';
+      default:
+        return '3M';
+    }
+  }
+
+  String get range1y {
+    switch (_lang) {
+      case 'en':
+        return '1Y';
+      case 'de':
+        return '1J';
+      default:
+        return '1A';
+    }
+  }
+
+  String get range5y {
+    switch (_lang) {
+      case 'en':
+        return '5Y';
+      case 'de':
+        return '5J';
+      default:
+        return '5A';
+    }
+  }
+
+  String get rangeAll {
+    switch (_lang) {
+      case 'en':
+        return 'All';
+      case 'it':
+        return 'Tutto';
+      case 'de':
+        return 'Alle';
+      default:
+        return 'Todo';
     }
   }
 }

@@ -1,17 +1,24 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../../domain/models/app_links_variables.dart';
 import '../../../l10n/app_localizations.dart';
 
 class HomeHeader extends StatefulWidget {
-  /// Cuándo se refrescaron los datos (para "Refrescado hace X").
+  /// Momento en que la app obtuvo los datos (consulta). Misma base para
+  /// "Refrescado hace X" y "Última actualización: ..."; solo cambia con refresh manual.
   final DateTime updatedAt;
-  /// Timestamp de la última medición del backend (para "Última actualización: ...").
-  final DateTime? lastMeasurementAt;
+
+  /// URLs desde `versions/variables` (se pasan desde el padre con Riverpod).
+  final AppLinksVariables? appLinks;
 
   const HomeHeader({
     super.key,
     required this.updatedAt,
-    this.lastMeasurementAt,
+    this.appLinks,
   });
 
   @override
@@ -39,35 +46,125 @@ class _HomeHeaderState extends State<HomeHeader> {
     final l10n = AppLocalizations.of(context);
     final difference = DateTime.now().difference(widget.updatedAt);
     if (difference.inSeconds < 60) return l10n.timeAgoJustNow;
-    if (difference.inMinutes < 60) return l10n.timeAgoMinutes(difference.inMinutes);
+    if (difference.inMinutes < 60) {
+      return l10n.timeAgoMinutes(difference.inMinutes);
+    }
     return l10n.timeAgoHours(difference.inHours);
   }
 
-  /// Formatea la fecha/hora en zona Argentina (UTC-3), como la envía el backend.
-  static String _formatLastMeasurement(DateTime d) {
-    final arg = d.toUtc().subtract(const Duration(hours: 3));
-    final y = arg.year;
-    final m = arg.month.toString().padLeft(2, '0');
-    final day = arg.day.toString().padLeft(2, '0');
-    final h = arg.hour.toString().padLeft(2, '0');
-    final min = arg.minute.toString().padLeft(2, '0');
+  /// Fecha/hora local del dispositivo (momento de la consulta en la app).
+  static String _formatConsultLocalTime(DateTime d) {
+    final l = d.toLocal();
+    final y = l.year;
+    final m = l.month.toString().padLeft(2, '0');
+    final day = l.day.toString().padLeft(2, '0');
+    final h = l.hour.toString().padLeft(2, '0');
+    final min = l.minute.toString().padLeft(2, '0');
     return '$y-$m-$day $h:$min';
+  }
+
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.tryParse(url.trim());
+    if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
+      return;
+    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  /// Botón de link con ícono Material: fondo transparente, sin borde.
+  Widget _linkButton({
+    required BuildContext context,
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    final color = Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.55)
+        ?? Colors.grey;
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(icon, size: 20, color: color),
+        ),
+      ),
+    );
+  }
+
+  /// Botón de link con ícono Font Awesome: fondo transparente, sin borde.
+  Widget _faLinkButton({
+    required BuildContext context,
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    final color = Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.55)
+        ?? Colors.grey;
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: FaIcon(icon, size: 18, color: color),
+        ),
+      ),
+    );
+  }
+
+  Widget _dividerLine(bool isDark) {
+    return Container(
+      height: 1,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [
+                  Colors.transparent,
+                  Colors.white.withOpacity(0.1),
+                  Colors.white.withOpacity(0.15),
+                  Colors.white.withOpacity(0.1),
+                  Colors.transparent,
+                ]
+              : [
+                  Colors.transparent,
+                  const Color(0xFF2196F3).withOpacity(0.2),
+                  const Color(0xFF2196F3).withOpacity(0.4),
+                  const Color(0xFF2196F3).withOpacity(0.2),
+                  Colors.transparent,
+                ],
+          stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withOpacity(0.3)
+                : const Color(0xFF2196F3).withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final logoSize = screenWidth * 0.25; // Logo más pequeño (25% del ancho)
+    final logoSize = screenWidth * 0.25;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context);
+    final links = widget.appLinks;
 
     return Container(
       width: double.infinity,
       padding: EdgeInsets.only(
         left: 10,
         right: 10,
-        top: MediaQuery.of(context).padding.top +
-            8, // Alineado con la tuerca (SafeArea + 8)
-        bottom: 8, // Padding inferior para la línea divisoria
+        top: MediaQuery.of(context).padding.top + 8,
+        bottom: 8,
       ),
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
@@ -77,7 +174,6 @@ class _HomeHeaderState extends State<HomeHeader> {
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Logo centrado - más compacto
           Container(
             width: logoSize,
             height: logoSize,
@@ -94,7 +190,7 @@ class _HomeHeaderState extends State<HomeHeader> {
           ),
           const SizedBox(height: 1),
           Text(
-            '${AppLocalizations.of(context).refreshedPrefix} ${_timeAgoText(context)}',
+            '${l10n.refreshedPrefix} ${_timeAgoText(context)}',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   fontSize: 12,
                   fontWeight: FontWeight.w400,
@@ -103,53 +199,55 @@ class _HomeHeaderState extends State<HomeHeader> {
                 ),
             textAlign: TextAlign.center,
           ),
-          if (widget.lastMeasurementAt != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              '${AppLocalizations.of(context).lastUpdate}: ${_formatLastMeasurement(widget.lastMeasurementAt!)}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w400,
-                    color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.85),
-                    letterSpacing: 0.1,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-          const SizedBox(height: 8),
-          // Línea divisoria
-          Container(
-            height: 1,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isDark
-                    ? [
-                        Colors.transparent,
-                        Colors.white.withOpacity(0.1),
-                        Colors.white.withOpacity(0.15),
-                        Colors.white.withOpacity(0.1),
-                        Colors.transparent,
-                      ]
-                    : [
-                        Colors.transparent,
-                        const Color(0xFF2196F3).withOpacity(0.2),
-                        const Color(0xFF2196F3).withOpacity(0.4),
-                        const Color(0xFF2196F3).withOpacity(0.2),
-                        Colors.transparent,
-                      ],
-                stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: isDark
-                      ? Colors.black.withOpacity(0.3)
-                      : const Color(0xFF2196F3).withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
+          const SizedBox(height: 4),
+          // Stack que se expande al ancho real de pantalla (sin padding negativo)
+          SizedBox(
+            width: screenWidth,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Texto centrado en todo el ancho
+                Text(
+                  '${l10n.lastUpdate}: ${_formatConsultLocalTime(widget.updatedAt)}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w400,
+                        color: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.color
+                            ?.withOpacity(0.85),
+                        letterSpacing: 0.1,
+                      ),
+                  textAlign: TextAlign.center,
                 ),
+                // Botón Twitter/X pegado al borde izquierdo real
+                if (links != null && links.hasTwitter)
+                  Positioned(
+                    left: 0,
+                    child: _faLinkButton(
+                      context: context,
+                      icon: FontAwesomeIcons.twitter,
+                      tooltip: l10n.linkTwitterLabel,
+                      onTap: () => _openUrl(links.urlTwitter!),
+                    ),
+                  ),
+                // Botón Web pegado al borde derecho real
+                if (links != null && links.hasWeb)
+                  Positioned(
+                    right: 0,
+                    child: _linkButton(
+                      context: context,
+                      icon: Icons.language_rounded,
+                      tooltip: l10n.linkWebLabel,
+                      onTap: () => _openUrl(links.urlWeb!),
+                    ),
+                  ),
               ],
             ),
           ),
+          const SizedBox(height: 8),
+          _dividerLine(isDark),
         ],
       ),
     );

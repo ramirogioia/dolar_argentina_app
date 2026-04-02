@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import '../../../core/cotizacion_calendar.dart';
 import '../../../data/repositories/dollar_repository.dart';
 import '../../../data/datasources/http_dollar_data_source.dart';
 import '../../../domain/models/bank.dart';
@@ -8,24 +9,46 @@ import '../../../domain/models/crypto_platform.dart';
 import '../../../domain/models/dollar_rate.dart';
 import '../../../domain/models/dollar_snapshot.dart';
 import '../../../domain/models/dollar_type.dart';
+import '../../../domain/models/app_links_variables.dart';
 import '../../settings/providers/settings_providers.dart';
 
 final _defaultBackendUrl =
     'https://raw.githubusercontent.com/ramirogioia/dolar_argentina_back/main/data';
 
-/// Fecha del último día de mercado anterior a [referenceDate].
-/// Oficial/MEP/CCL/Tarjeta no operan sábado/domingo.
-/// Lunes → viernes. Sábado/domingo (datos del viernes) → jueves. Martes a viernes → día anterior.
-DateTime _getPreviousMarketDate(DateTime referenceDate) {
-  final w = referenceDate.weekday; // 1=Mon, 7=Sun
-  if (w == DateTime.monday)
-    return referenceDate.subtract(const Duration(days: 3)); // Viernes
-  if (w == DateTime.saturday)
-    return referenceDate.subtract(const Duration(days: 2)); // Jueves
-  if (w == DateTime.sunday)
-    return referenceDate.subtract(const Duration(days: 3)); // Jueves
-  return referenceDate.subtract(const Duration(days: 1));
+/// Misma base que [VersionChecker]: `.../data` → `.../versions/variables`.
+String variablesJsonUrlFromApiBase(String apiBase) {
+  return apiBase.replaceFirst(RegExp(r'/data/?$'), '/versions/variables');
 }
+
+/// JSON remoto con `url_twitter` y `url_web` (sin redeploy del front).
+final appLinksVariablesProvider =
+    FutureProvider<AppLinksVariables?>((ref) async {
+  final apiUrl = ref.watch(apiUrlProvider);
+  final base = apiUrl.isNotEmpty ? apiUrl : _defaultBackendUrl;
+  final uri = Uri.parse(variablesJsonUrlFromApiBase(base)).replace(
+    queryParameters: {
+      '_t': DateTime.now().millisecondsSinceEpoch.toString(),
+    },
+  );
+  try {
+    final response = await http.get(
+      uri,
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'DolarArgentinaApp/1.0',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    ).timeout(const Duration(seconds: 12));
+    if (response.statusCode != 200) {
+      return null;
+    }
+    final map = jsonDecode(response.body) as Map<String, dynamic>;
+    return AppLinksVariables.fromJson(map);
+  } catch (_) {
+    return null;
+  }
+});
 
 final dollarRepositoryProvider = Provider<DollarRepository>((ref) {
   final apiUrl = ref.watch(apiUrlProvider);
@@ -75,34 +98,33 @@ final cryptoPlatformRatesProvider =
 
       if (dolarCripto == null) return _emptyCryptoRates;
 
-      // Cargar archivo de ayer para comparar variaciones
+      // Misma idea que HttpDollarDataSource: día calendario anterior a `fecha`; si no hay JSON, retroceder.
       Map<String, dynamic>? ultimaCorridaAyer;
       try {
         final apiUrl = ref.read(apiUrlProvider);
         final baseUrl = apiUrl.isNotEmpty ? apiUrl : _defaultBackendUrl;
-        final now = DateTime.now();
-        final yesterday = now.subtract(const Duration(days: 1));
-        final yesterdayStr =
-            '${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}';
-        final yesterdayUrl =
-            Uri.parse('$baseUrl/cotizaciones_$yesterdayStr.json');
-
-        final yesterdayResponse = await http.get(
-          yesterdayUrl,
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'DolarArgentinaApp/1.0',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-          },
-        ).timeout(const Duration(seconds: 10));
-
-        if (yesterdayResponse.statusCode == 200) {
-          final body = yesterdayResponse.body.trim();
-          if (!body.startsWith('<!') && !body.startsWith('<html')) {
-            final jsonAyer = jsonDecode(body) as Map<String, dynamic>;
-            ultimaCorridaAyer =
-                jsonAyer['ultima_corrida'] as Map<String, dynamic>?;
+        final referenceDate = parseCotizacionReferenceDate(jsonData);
+        for (var i = 1; i <= 7; i++) {
+          final day = referenceDate.subtract(Duration(days: i));
+          final ds = formatCotizacionDate(day);
+          final yesterdayUrl = Uri.parse('$baseUrl/cotizaciones_$ds.json');
+          final yesterdayResponse = await http.get(
+            yesterdayUrl,
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'DolarArgentinaApp/1.0',
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+            },
+          ).timeout(const Duration(seconds: 10));
+          if (yesterdayResponse.statusCode == 200) {
+            final body = yesterdayResponse.body.trim();
+            if (!body.startsWith('<!') && !body.startsWith('<html')) {
+              final jsonAyer = jsonDecode(body) as Map<String, dynamic>;
+              ultimaCorridaAyer =
+                  jsonAyer['ultima_corrida'] as Map<String, dynamic>?;
+              if (ultimaCorridaAyer != null) break;
+            }
           }
         }
       } catch (e) {
@@ -183,31 +205,41 @@ Map<Bank, DollarRate> get _emptyBankRates => {
     };
 
 /// Última corrida dolar_oficial del último día hábil (para variación en front).
-/// Así la comparación de valores para variación se hace acá, sin tocar el backend.
+/// Usa `fecha` del JSON con calendario estable; si falta el archivo, retrocede días hábiles.
 final previousMarketDayOficialProvider =
     FutureProvider<Map<String, dynamic>?>((ref) async {
   try {
+    final jsonData = await ref.watch(fullJsonDataProvider.future);
+    if (jsonData.isEmpty) return null;
+
+    final refDate = parseCotizacionReferenceDate(jsonData);
     final baseUrl = ref.read(apiUrlProvider);
     final url = baseUrl.isNotEmpty ? baseUrl : _defaultBackendUrl;
-    final refDate = DateTime.now();
-    final prevDate = _getPreviousMarketDate(refDate);
-    final prevStr =
-        '${prevDate.year}-${prevDate.month.toString().padLeft(2, '0')}-${prevDate.day.toString().padLeft(2, '0')}';
-    final uri = Uri.parse('$url/cotizaciones_$prevStr.json');
-    final response = await http.get(
-      uri,
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'DolarArgentinaApp/1.0',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-      },
-    ).timeout(const Duration(seconds: 10));
-    if (response.statusCode != 200) return null;
-    final body = response.body.trim();
-    if (body.startsWith('<!') || body.startsWith('<html')) return null;
-    final json = jsonDecode(body) as Map<String, dynamic>;
-    return json['ultima_corrida']?['dolar_oficial'] as Map<String, dynamic>?;
+    var cursor = getPreviousMarketDate(refDate);
+    for (var attempt = 0; attempt < 8; attempt++) {
+      final prevStr = formatCotizacionDate(cursor);
+      final uri = Uri.parse('$url/cotizaciones_$prevStr.json');
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'DolarArgentinaApp/1.0',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      ).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final body = response.body.trim();
+        if (!body.startsWith('<!') && !body.startsWith('<html')) {
+          final json = jsonDecode(body) as Map<String, dynamic>;
+          final oficial =
+              json['ultima_corrida']?['dolar_oficial'] as Map<String, dynamic>?;
+          if (oficial != null && oficial.isNotEmpty) return oficial;
+        }
+      }
+      cursor = getPreviousMarketDate(cursor);
+    }
+    return null;
   } catch (e) {
     return null;
   }
@@ -354,7 +386,27 @@ Map<Bank, DollarRate> _buildBankRates(
           changePercent = ((buy - prevBuy) / prevBuy) * 100;
         }
       }
-      if (changePercent == null) changePercent = 0.0;
+    }
+
+    // Si compra no muestra movimiento (o es 0%), usar venta como el dólar blue en el backend.
+    if ((changePercent == null || changePercent.abs() < 0.01) &&
+        sell != null &&
+        sell > 0) {
+      final previousBancoData =
+          dolarOficialPrevMarket?[entry.key] as Map<String, dynamic>?;
+      if (previousBancoData != null) {
+        final previousSell = _parseDouble(previousBancoData['venta']);
+        if (previousSell != null && previousSell > 0) {
+          final ventaPct = ((sell - previousSell) / previousSell) * 100;
+          if (ventaPct.abs() >= 0.01) {
+            changePercent = ventaPct;
+          }
+        }
+      }
+    }
+
+    if (buy != null && buy > 0 && changePercent == null) {
+      changePercent = 0.0;
     }
 
     rates[entry.value] = DollarRate(

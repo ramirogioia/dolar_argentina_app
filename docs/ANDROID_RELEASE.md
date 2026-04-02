@@ -106,7 +106,8 @@ No hace falta configurar nada más para notificaciones en el build release.
 - **App ID** en `AndroidManifest.xml`: `ca-app-pub-6119092953994163~3815613465` (app Android en AdMob).  
 - **Modo release**: En release (`kReleaseMode`) se usan Ad Unit IDs reales; en debug, IDs de prueba.  
 - **Banner home**: `ca-app-pub-6119092953994163/5181773243`.  
-- **Banner calculadora**: `ca-app-pub-6119092953994163/7548189933`.
+- **Banner calculadora**: `ca-app-pub-6119092953994163/7548189933`.  
+- **Banner configuración**: `ca-app-pub-6119092953994163/1224930870` (Android; iOS: `…/6477257551` en `ad_banner.dart`).
 
 ### Resumen
 

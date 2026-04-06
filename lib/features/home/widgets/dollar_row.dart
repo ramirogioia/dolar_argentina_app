@@ -23,8 +23,6 @@ class DollarRow extends ConsumerWidget {
     // Si es crypto, usar los valores de la plataforma seleccionada
     // Si es official, usar los valores del banco seleccionado
     DollarRate displayRate;
-    Bank? selectedBankForIcon;
-    CryptoPlatform? selectedPlatformForIcon;
 
     if (rate.type == DollarType.crypto) {
       final platformRatesAsync = ref.watch(cryptoPlatformRatesProvider);
@@ -38,7 +36,6 @@ class DollarRow extends ConsumerWidget {
           effectivePlatformsList.contains(selectedPlatform)
               ? selectedPlatform
               : effectivePlatformsList.first;
-      selectedPlatformForIcon = effectivePlatform;
       displayRate = platformRates[effectivePlatform] ?? rate;
       if (displayRate.changePercent == null && rate.changePercent != null) {
         displayRate = DollarRate(
@@ -60,7 +57,6 @@ class DollarRow extends ConsumerWidget {
       final effectiveBank = effectiveBanks.contains(selectedBank)
           ? selectedBank
           : effectiveBanks.first;
-      selectedBankForIcon = effectiveBank;
       displayRate = bankRates[effectiveBank] ?? rate;
       if (displayRate.changePercent == null && rate.changePercent != null) {
         displayRate = DollarRate(
@@ -215,22 +211,8 @@ class DollarRow extends ConsumerWidget {
                             _priceColorForVariation(effectiveChangePercent),
                       ),
                     ),
-                    if (selectedBankForIcon != null) ...[
-                      const SizedBox(width: 12),
-                      _buildBankLogo(context, selectedBankForIcon.logoPath, 40, 40),
-                      const SizedBox(width: 8),
-                    ] else if (selectedPlatformForIcon != null) ...[
-                      const SizedBox(width: 12),
-                      _buildPlatformLogo(context, selectedPlatformForIcon.logoPath, 40, 40),
-                      const SizedBox(width: 8),
-                    ],
-                    // espacio para botón histórico + compartir (solo blue/oficial)
-                    SizedBox(
-                      width: (rate.type == DollarType.blue ||
-                              rate.type == DollarType.official)
-                          ? 72
-                          : 36,
-                    ),
+                    // Mismo ancho en todas las cards para alinear compra/venta; espacio para histórico + compartir
+                    const SizedBox(width: 72),
                   ],
                 ),
               ],
@@ -776,60 +758,68 @@ class _SelectorTrigger extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const radius = 8.0;
+    final borderColor = accentColor.withOpacity(isDark ? 0.5 : 0.4);
+    // Radio interior (~radius − borde) para que la franja superior no “escape” del redondeo
+    final innerClipRadius = radius > 1 ? radius - 1 : 0.0;
     return Material(
       color: Colors.transparent,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(radius),
         child: Container(
           decoration: BoxDecoration(
             color: isDark
                 ? const Color(0xFF1E1E1E).withOpacity(0.6)
                 : Colors.white.withOpacity(0.7),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: accentColor.withOpacity(isDark ? 0.5 : 0.4),
-              width: 1,
-            ),
+            borderRadius: BorderRadius.circular(radius),
+            border: Border.all(color: borderColor, width: 1),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                height: 1.5,
-                decoration: BoxDecoration(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(innerClipRadius),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ColoredBox(
                   color: accentColor.withOpacity(0.92),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+                  child: const SizedBox(height: 1.5),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    icon,
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        label,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Theme.of(context).textTheme.bodyMedium?.color,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.1,
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  child: Row(
+                    children: [
+                      icon,
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          label,
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color:
+                                Theme.of(context).textTheme.bodyMedium?.color,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.1,
+                          ),
                         ),
                       ),
-                    ),
-                    Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      size: 18,
-                      color: accentColor.withOpacity(isDark ? 0.9 : 0.85),
-                    ),
-                  ],
+                      Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 18,
+                        color: accentColor.withOpacity(isDark ? 0.9 : 0.85),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

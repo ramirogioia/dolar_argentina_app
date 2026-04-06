@@ -14,15 +14,15 @@ enum CryptoPlatform {
   String get displayName {
     switch (this) {
       case CryptoPlatform.binance:
-        return 'Binance P2P';
+        return 'Binance';
       case CryptoPlatform.kucoin:
-        return 'KuCoin P2P';
+        return 'KuCoin';
       case CryptoPlatform.bybit:
-        return 'Bybit P2P';
+        return 'Bybit';
       case CryptoPlatform.okx:
-        return 'OKX P2P';
+        return 'OKX';
       case CryptoPlatform.bitget:
-        return 'Bitget P2P';
+        return 'Bitget';
       case CryptoPlatform.dolarapp:
         return 'DolarApp';
       case CryptoPlatform.airtm:

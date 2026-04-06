@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import '../../../app/route_observer.dart';
+
 /// Unidad AdMob — banner pantalla Configuración (iOS).
 const String adMobSettingsBannerUnitIdIos =
     'ca-app-pub-6119092953994163/6477257551';
@@ -31,7 +33,7 @@ class AdBanner extends StatefulWidget {
   State<AdBanner> createState() => _AdBannerState();
 }
 
-class _AdBannerState extends State<AdBanner> {
+class _AdBannerState extends State<AdBanner> with RouteAware, WidgetsBindingObserver {
   BannerAd? _bannerAd;
   bool _isAdLoaded = false;
   String? _errorMessage;
@@ -41,8 +43,50 @@ class _AdBannerState extends State<AdBanner> {
   @override
   void initState() {
     super.initState();
-    // No podemos cargar aquí porque no tenemos contexto
-    // Cargaremos en el primer build
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      appRouteObserver.unsubscribe(this);
+      appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    appRouteObserver.unsubscribe(this);
+    WidgetsBinding.instance.removeObserver(this);
+    _loadTimeout?.cancel();
+    _bannerAd?.dispose();
+    super.dispose();
+  }
+
+  /// Al volver desde otra pantalla (o reanudar la app) con fallo previo, se intenta de nuevo.
+  @override
+  void didPopNext() => _retryLoadAfterFailure();
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _retryLoadAfterFailure();
+    }
+  }
+
+  void _retryLoadAfterFailure() {
+    if (!mounted || _errorMessage == null) return;
+    _loadTimeout?.cancel();
+    _loadTimeout = null;
+    _bannerAd?.dispose();
+    _bannerAd = null;
+    setState(() {
+      _errorMessage = null;
+      _isAdLoaded = false;
+      _currentAdSize = null;
+    });
   }
 
   // Detecta si es tablet (ancho >= 600px)
@@ -151,13 +195,6 @@ class _AdBannerState extends State<AdBanner> {
       return useReal ? realIos : testIos;
     }
     return useReal ? realIos : testIos;
-  }
-
-  @override
-  void dispose() {
-    _loadTimeout?.cancel();
-    _bannerAd?.dispose();
-    super.dispose();
   }
 
   @override

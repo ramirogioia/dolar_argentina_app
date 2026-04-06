@@ -410,6 +410,10 @@ class _ChartAreaState extends State<_ChartArea> {
         spots.add(FlSpot(i.toDouble(), v));
       }
     }
+    if (spots.isEmpty) return _EmptyState(l10n: widget.l10n);
+
+    final minX = spots.first.x;
+    final maxX = spots.last.x;
 
     final lineColor = widget.type == HistoricalDollarType.blue
         ? AppTheme.primaryBlue
@@ -440,9 +444,23 @@ class _ChartAreaState extends State<_ChartArea> {
           const SizedBox(height: 12),
           // ── Gráfico ────────────────────────────────────────────────────
           Expanded(
-            child: LineChart(
-              duration: const Duration(milliseconds: 300),
-              LineChartData(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final chartW = constraints.maxWidth.isFinite
+                    ? constraints.maxWidth
+                    : 360.0;
+                final bottomTitleInterval = _bottomTitleInterval(
+                  range: widget.range,
+                  legacyPointCount: spots.length.toDouble(),
+                  minX: minX,
+                  maxX: maxX,
+                  chartWidth: chartW,
+                );
+                return LineChart(
+                  duration: const Duration(milliseconds: 300),
+                  LineChartData(
+                minX: minX,
+                maxX: maxX,
                 minY: bottomY,
                 maxY: topY,
                 clipData: const FlClipData.all(),
@@ -471,9 +489,14 @@ class _ChartAreaState extends State<_ChartArea> {
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 28,
-                      interval: _bottomInterval(spots.length.toDouble()),
+                      interval: bottomTitleInterval,
                       getTitlesWidget: (value, meta) => _bottomTitle(
-                          value, meta, widget.serie, widget.range, isDark),
+                        value,
+                        meta,
+                        widget.serie,
+                        widget.range,
+                        isDark,
+                      ),
                     ),
                   ),
                   rightTitles: const AxisTitles(
@@ -573,6 +596,8 @@ class _ChartAreaState extends State<_ChartArea> {
                   ),
                 ],
               ),
+                );
+              },
             ),
           ),
           const SizedBox(height: 8),
@@ -628,6 +653,56 @@ class _ChartAreaState extends State<_ChartArea> {
     return 365;
   }
 
+  /// Intervalo en el eje X para rangos largos: limita la cantidad de etiquetas según el ancho
+  /// útil del gráfico (evita solapamiento en celular).
+  static double _bottomTitleInterval({
+    required TimeRange range,
+    required double legacyPointCount,
+    required double minX,
+    required double maxX,
+    required double chartWidth,
+  }) {
+    final span = maxX - minX;
+    if (span <= 0) return 1;
+
+    if (range == TimeRange.week7 || range == TimeRange.month1) {
+      return _bottomInterval(legacyPointCount);
+    }
+
+    const leftAxis = 58.0;
+    const horizontalPadding = 24.0;
+    final plotW =
+        (chartWidth - leftAxis - horizontalPadding).clamp(72.0, 2000.0);
+
+    final double minPxPerLabel;
+    int minLabels;
+    int maxLabelsCap;
+    if (range == TimeRange.month3) {
+      // 3M: pocas marcas; "MMM yy" se pisa fácil en celular
+      minPxPerLabel = 76;
+      minLabels = 3;
+      maxLabelsCap = 4;
+    } else if (range == TimeRange.year1) {
+      minPxPerLabel = 52;
+      minLabels = 4;
+      maxLabelsCap = 6;
+    } else if (range == TimeRange.year5 || range == TimeRange.all) {
+      minPxPerLabel = 42;
+      minLabels = 4;
+      maxLabelsCap = 6;
+    } else {
+      minPxPerLabel = 48;
+      minLabels = 4;
+      maxLabelsCap = 6;
+    }
+
+    var maxLabels = (plotW / minPxPerLabel).floor();
+    maxLabels = maxLabels.clamp(minLabels, maxLabelsCap);
+
+    final step = (span / maxLabels).ceilToDouble();
+    return step < 1 ? 1 : step;
+  }
+
   static Widget _leftTitle(
     double value,
     TitleMeta meta,
@@ -658,6 +733,25 @@ class _ChartAreaState extends State<_ChartArea> {
       List<HistoricalRate> serie, TimeRange range, bool isDark) {
     final idx = value.toInt();
     if (idx < 0 || idx >= serie.length) return const SizedBox.shrink();
+
+    // Evita dos ticks con el mismo "MMM yy" (típico en 3M con intervalo fino)
+    if (range == TimeRange.month3 || range == TimeRange.year1) {
+      final interval = meta.appliedInterval;
+      if (interval > 0) {
+        final prevTick = value - interval;
+        if (prevTick >= meta.min - 1e-6) {
+          final prevIdx = prevTick.round();
+          if (prevIdx >= 0 && prevIdx < serie.length) {
+            final dCurr = serie[idx].date;
+            final dPrev = serie[prevIdx].date;
+            if (dCurr.year == dPrev.year && dCurr.month == dPrev.month) {
+              return const SizedBox.shrink();
+            }
+          }
+        }
+      }
+    }
+
     final date = serie[idx].date;
     String label;
     if (range == TimeRange.week7 || range == TimeRange.month1) {

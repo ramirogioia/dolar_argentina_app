@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../route_observer.dart';
 import '../../features/home/pages/home_page.dart';
 import '../../features/settings/pages/settings_page.dart';
 import '../../features/calculator/pages/calculator_page.dart';
@@ -10,6 +11,7 @@ final navigatorKey = GlobalKey<NavigatorState>();
 
 final appRouter = GoRouter(
   navigatorKey: navigatorKey,
+  observers: [appRouteObserver],
   initialLocation: '/',
   routes: [
     GoRoute(

@@ -218,9 +218,10 @@ class DollarRow extends ConsumerWidget {
               ],
             ),
                   ),
-                  // Botón histórico (solo blue y oficial): a la izquierda del compartir
+                  // Botón histórico (blue, oficial, cripto): a la izquierda del compartir
                   if (rate.type == DollarType.blue ||
-                      rate.type == DollarType.official)
+                      rate.type == DollarType.official ||
+                      rate.type == DollarType.crypto)
                     Positioned(
                       bottom: 6,
                       right: 42,
@@ -239,9 +240,14 @@ class DollarRow extends ConsumerWidget {
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                         onPressed: () {
-                          final historicalType = rate.type == DollarType.blue
-                              ? HistoricalDollarType.blue
-                              : HistoricalDollarType.oficial;
+                          final HistoricalDollarType historicalType;
+                          if (rate.type == DollarType.blue) {
+                            historicalType = HistoricalDollarType.blue;
+                          } else if (rate.type == DollarType.official) {
+                            historicalType = HistoricalDollarType.oficial;
+                          } else {
+                            historicalType = HistoricalDollarType.cripto;
+                          }
                           context.push('/historicos', extra: historicalType);
                         },
                       ),
@@ -400,6 +406,7 @@ class DollarRow extends ConsumerWidget {
     }
 
     return Container(
+      width: 78,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withOpacity(0.15),
@@ -408,6 +415,7 @@ class DollarRow extends ConsumerWidget {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             icon,
@@ -456,8 +464,8 @@ class DollarRow extends ConsumerWidget {
       });
     }
 
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 150),
+    return SizedBox(
+      width: 148,
       child: _SelectorTrigger(
         isDark: isDark,
         accentColor: accentColor,
@@ -588,8 +596,8 @@ class DollarRow extends ConsumerWidget {
       });
     }
 
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 150),
+    return SizedBox(
+      width: 148,
       child: _SelectorTrigger(
         isDark: isDark,
         accentColor: accentColor,
@@ -793,21 +801,46 @@ class _SelectorTrigger extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   child: Row(
                     children: [
-                      icon,
-                      const SizedBox(width: 6),
                       Expanded(
-                        child: Text(
-                          label,
-                          textAlign: TextAlign.center,
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color:
-                                Theme.of(context).textTheme.bodyMedium?.color,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.1,
-                          ),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            // Icono pegado al texto; el bloque entero centrado.
+                            const iconGap = 6.0;
+                            const iconSlot =
+                                22.0; // logo ~14px + holgura (BBVA, KuCoin, etc.)
+                            final textMax = (constraints.maxWidth -
+                                    iconSlot -
+                                    iconGap)
+                                .clamp(28.0, constraints.maxWidth);
+                            return Center(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  icon,
+                                  SizedBox(width: iconGap),
+                                  ConstrainedBox(
+                                    constraints:
+                                        BoxConstraints(maxWidth: textMax),
+                                    child: Text(
+                                      label,
+                                      textAlign: TextAlign.start,
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.color,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.1,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
                       ),
                       Icon(

@@ -1,5 +1,9 @@
 /// URLs publicadas en el backend (`versions/variables`), sin deploy de la app.
 class AppLinksVariables {
+  /// Página oficial en Facebook (no depende de `url_web` del backend).
+  static const String facebookPageUrl =
+      'https://www.facebook.com/profile.php?id=61573279525305';
+
   final String? urlTwitter;
   final String? urlWeb;
 

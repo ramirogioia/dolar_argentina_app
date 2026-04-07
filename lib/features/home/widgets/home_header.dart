@@ -71,28 +71,6 @@ class _HomeHeaderState extends State<HomeHeader> {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  /// Botón de link con ícono Material: fondo transparente, sin borde.
-  Widget _linkButton({
-    required BuildContext context,
-    required IconData icon,
-    required String tooltip,
-    required VoidCallback onTap,
-  }) {
-    final color = Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.55)
-        ?? Colors.grey;
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        customBorder: const CircleBorder(),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Icon(icon, size: 20, color: color),
-        ),
-      ),
-    );
-  }
-
   /// Botón de link con ícono Font Awesome: fondo transparente, sin borde.
   Widget _faLinkButton({
     required BuildContext context,
@@ -200,13 +178,15 @@ class _HomeHeaderState extends State<HomeHeader> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 4),
-          // Stack que se expande al ancho real de pantalla (sin padding negativo)
+          // Altura fija + clip none: el Stack antes solo medía ~1 línea de texto y recortaba
+          // los FaIcon (sobre todo Facebook, más “alto” que el pájaro de Twitter).
           SizedBox(
             width: screenWidth,
+            height: 40,
             child: Stack(
               alignment: Alignment.center,
+              clipBehavior: Clip.none,
               children: [
-                // Texto centrado en todo el ancho
                 Text(
                   '${l10n.lastUpdate}: ${_formatConsultLocalTime(widget.updatedAt)}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -221,28 +201,36 @@ class _HomeHeaderState extends State<HomeHeader> {
                       ),
                   textAlign: TextAlign.center,
                 ),
-                // Botón Twitter/X pegado al borde izquierdo real
                 if (links != null && links.hasTwitter)
                   Positioned(
                     left: 0,
+                    top: 0,
+                    bottom: 0,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: _faLinkButton(
+                        context: context,
+                        icon: FontAwesomeIcons.twitter,
+                        tooltip: l10n.linkTwitterLabel,
+                        onTap: () => _openUrl(links.urlTwitter!),
+                      ),
+                    ),
+                  ),
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Align(
+                    alignment: Alignment.centerRight,
                     child: _faLinkButton(
                       context: context,
-                      icon: FontAwesomeIcons.twitter,
-                      tooltip: l10n.linkTwitterLabel,
-                      onTap: () => _openUrl(links.urlTwitter!),
+                      icon: FontAwesomeIcons.facebook,
+                      tooltip: l10n.linkFacebookLabel,
+                      onTap: () =>
+                          _openUrl(AppLinksVariables.facebookPageUrl),
                     ),
                   ),
-                // Botón Web pegado al borde derecho real
-                if (links != null && links.hasWeb)
-                  Positioned(
-                    right: 0,
-                    child: _linkButton(
-                      context: context,
-                      icon: Icons.language_rounded,
-                      tooltip: l10n.linkWebLabel,
-                      onTap: () => _openUrl(links.urlWeb!),
-                    ),
-                  ),
+                ),
               ],
             ),
           ),

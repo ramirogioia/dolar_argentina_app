@@ -2,11 +2,16 @@ class HistoricalRate {
   final DateTime date;
   final double? blueVenta;
   final double? oficialVenta;
+  /// USDT/ARS P2P (mismo criterio que el backend en ``dolar_cripto.binance``).
+  final double? binanceCompra;
+  final double? binanceVenta;
 
   const HistoricalRate({
     required this.date,
     this.blueVenta,
     this.oficialVenta,
+    this.binanceCompra,
+    this.binanceVenta,
   });
 
   factory HistoricalRate.fromJson(Map<String, dynamic> json) {
@@ -14,6 +19,8 @@ class HistoricalRate {
       date: DateTime.parse(json['fecha'] as String),
       blueVenta: (json['blue_venta'] as num?)?.toDouble(),
       oficialVenta: (json['oficial_venta'] as num?)?.toDouble(),
+      binanceCompra: (json['binance_compra'] as num?)?.toDouble(),
+      binanceVenta: (json['binance_venta'] as num?)?.toDouble(),
     );
   }
 }

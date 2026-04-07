@@ -13,13 +13,20 @@ import '../../home/widgets/ad_banner.dart';
 
 // ─── Tipos de dólar disponibles en el histórico ──────────────────────────────
 
-enum HistoricalDollarType { blue, oficial }
+enum HistoricalDollarType { blue, oficial, cripto }
+
+/// Color de línea del histórico USDT/ARS (P2P), coherente con “cripto” en la app.
+const Color _historicoCriptoLineColor = Color(0xFFE6B00C);
 
 // ─── Rangos de tiempo ─────────────────────────────────────────────────────────
 
 enum TimeRange {
   week7,
+  /// Solo para histórico Cripto (pocos datos).
+  days15,
   month1,
+  /// Solo para histórico Cripto (~2 meses).
+  months2,
   month3,
   year1,
   year5,
@@ -29,8 +36,12 @@ enum TimeRange {
     switch (this) {
       case TimeRange.week7:
         return l10n.range7d;
+      case TimeRange.days15:
+        return l10n.range15d;
       case TimeRange.month1:
         return l10n.range1m;
+      case TimeRange.months2:
+        return l10n.range2m;
       case TimeRange.month3:
         return l10n.range3m;
       case TimeRange.year1:
@@ -46,8 +57,12 @@ enum TimeRange {
     switch (this) {
       case TimeRange.week7:
         return const Duration(days: 7);
+      case TimeRange.days15:
+        return const Duration(days: 15);
       case TimeRange.month1:
         return const Duration(days: 30);
+      case TimeRange.months2:
+        return const Duration(days: 60);
       case TimeRange.month3:
         return const Duration(days: 91);
       case TimeRange.year1:
@@ -59,6 +74,26 @@ enum TimeRange {
     }
   }
 }
+
+/// Blue / Oficial: series largas (años).
+const List<TimeRange> _timeRangesStandard = [
+  TimeRange.week7,
+  TimeRange.month1,
+  TimeRange.month3,
+  TimeRange.year1,
+  TimeRange.year5,
+  TimeRange.all,
+];
+
+/// Cripto: pocos meses de datos.
+const List<TimeRange> _timeRangesCripto = [
+  TimeRange.week7,
+  TimeRange.days15,
+  TimeRange.month1,
+  TimeRange.months2,
+  TimeRange.month3,
+  TimeRange.all,
+];
 
 // ─── Página principal ─────────────────────────────────────────────────────────
 
@@ -75,10 +110,21 @@ class _HistoricosPageState extends ConsumerState<HistoricosPage> {
   late HistoricalDollarType _selectedType;
   TimeRange _selectedRange = TimeRange.month1;
 
+  static TimeRange _coerceRangeForType(
+    HistoricalDollarType type,
+    TimeRange r,
+  ) {
+    final valid = type == HistoricalDollarType.cripto
+        ? _timeRangesCripto
+        : _timeRangesStandard;
+    return valid.contains(r) ? r : TimeRange.month1;
+  }
+
   @override
   void initState() {
     super.initState();
     _selectedType = widget.initialType ?? HistoricalDollarType.blue;
+    _selectedRange = _coerceRangeForType(_selectedType, _selectedRange);
   }
 
   @override
@@ -88,6 +134,7 @@ class _HistoricosPageState extends ConsumerState<HistoricosPage> {
         widget.initialType != null) {
       setState(() {
         _selectedType = widget.initialType!;
+        _selectedRange = _coerceRangeForType(_selectedType, _selectedRange);
       });
     }
   }
@@ -96,6 +143,7 @@ class _HistoricosPageState extends ConsumerState<HistoricosPage> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final snapshotAsync = ref.watch(historicalSnapshotProvider);
+    final binanceAsync = ref.watch(historicalBinanceSnapshotProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -121,7 +169,8 @@ class _HistoricosPageState extends ConsumerState<HistoricosPage> {
       body: Stack(
         children: [
           snapshotAsync.when(
-            data: (snapshot) => _buildContent(context, snapshot, l10n),
+            data: (snapshot) =>
+                _buildContent(context, snapshot, binanceAsync, l10n),
             loading: () => const _LoadingState(),
             error: (err, _) => _ErrorState(
               onRetry: () => ref.invalidate(historicalSnapshotProvider),
@@ -161,35 +210,68 @@ class _HistoricosPageState extends ConsumerState<HistoricosPage> {
   Widget _buildContent(
     BuildContext context,
     HistoricalSnapshot snapshot,
+    AsyncValue<HistoricalSnapshot> binanceAsync,
     AppLocalizations l10n,
   ) {
-    final filtered = _filterSerie(snapshot.serie);
+    final blueFiltered = _filterSerie(snapshot.serie);
+
+    final Widget chartSection;
+    if (_selectedType == HistoricalDollarType.cripto) {
+      chartSection = binanceAsync.when(
+        loading: () => const _LoadingState(),
+        error: (_, __) => _ErrorState(
+          onRetry: () =>
+              ref.invalidate(historicalBinanceSnapshotProvider),
+          l10n: l10n,
+        ),
+        data: (binanceSnap) {
+          final filtered = _filterSerie(binanceSnap.serie);
+          if (filtered.isEmpty) {
+            return _EmptyState(l10n: l10n);
+          }
+          return _ChartArea(
+            serie: filtered,
+            type: _selectedType,
+            range: _selectedRange,
+            l10n: l10n,
+            footerText: l10n.dataSourceFooter,
+          );
+        },
+      );
+    } else {
+      chartSection = blueFiltered.isEmpty
+          ? _EmptyState(l10n: l10n)
+          : _ChartArea(
+              serie: blueFiltered,
+              type: _selectedType,
+              range: _selectedRange,
+              l10n: l10n,
+              footerText: l10n.dataSourceFooter,
+            );
+    }
 
     return Column(
       children: [
         // ── Filtro tipo de dólar ─────────────────────────────────────────
         _DollarTypeFilter(
           selected: _selectedType,
-          onChanged: (t) => setState(() => _selectedType = t),
+          onChanged: (t) => setState(() {
+            _selectedType = t;
+            _selectedRange = _coerceRangeForType(t, _selectedRange);
+          }),
           l10n: l10n,
         ),
         // ── Filtro rango de tiempo ───────────────────────────────────────
         _TimeRangeFilter(
+          ranges: _selectedType == HistoricalDollarType.cripto
+              ? _timeRangesCripto
+              : _timeRangesStandard,
           selected: _selectedRange,
           onChanged: (r) => setState(() => _selectedRange = r),
           l10n: l10n,
         ),
         // ── Gráfico ─────────────────────────────────────────────────────
-        Expanded(
-          child: filtered.isEmpty
-              ? _EmptyState(l10n: l10n)
-              : _ChartArea(
-                  serie: filtered,
-                  type: _selectedType,
-                  range: _selectedRange,
-                  l10n: l10n,
-                ),
-        ),
+        Expanded(child: chartSection),
         // Espacio para el ad banner
         const SizedBox(height: 116),
       ],
@@ -221,79 +303,101 @@ class _DollarTypeFilter extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primary = Theme.of(context).colorScheme.primary;
+    final types = HistoricalDollarType.values;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Row(
-        children: HistoricalDollarType.values.map((type) {
-          final isSelected = selected == type;
-          final label = type == HistoricalDollarType.blue
-              ? l10n.historicosBlue
-              : l10n.historicosOficial;
-          return Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(
-                right: type == HistoricalDollarType.blue ? 6 : 0,
-                left: type == HistoricalDollarType.oficial ? 6 : 0,
-              ),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeInOut,
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () => onChanged(type),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? primary
-                            : isDark
-                                ? const Color(0xFF2C2C2C)
-                                : Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: isSelected
-                              ? primary
-                              : isDark
-                                  ? const Color(0xFF3C3C3C)
-                                  : Colors.grey.shade300,
-                          width: 1.5,
-                        ),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: primary.withOpacity(0.25),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ]
-                            : [],
-                      ),
-                      child: Text(
-                        label,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: isSelected
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: isSelected
-                              ? Colors.white
-                              : isDark
-                                  ? Colors.white70
-                                  : Colors.grey.shade700,
-                          letterSpacing: 0.1,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+        children: [
+          for (var i = 0; i < types.length; i++) ...[
+            if (i > 0) const SizedBox(width: 6),
+            Expanded(
+              child: _buildTypeChip(
+                context,
+                types[i],
+                isDark: isDark,
+                primary: primary,
               ),
             ),
-          );
-        }).toList(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _label(HistoricalDollarType type) {
+    switch (type) {
+      case HistoricalDollarType.blue:
+        return l10n.historicosBlue;
+      case HistoricalDollarType.oficial:
+        return l10n.historicosOficial;
+      case HistoricalDollarType.cripto:
+        return l10n.historicosCripto;
+    }
+  }
+
+  Widget _buildTypeChip(
+    BuildContext context,
+    HistoricalDollarType type, {
+    required bool isDark,
+    required Color primary,
+  }) {
+    final isSelected = selected == type;
+    final label = _label(type);
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeInOut,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => onChanged(type),
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? primary
+                  : isDark
+                      ? const Color(0xFF2C2C2C)
+                      : Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isSelected
+                    ? primary
+                    : isDark
+                        ? const Color(0xFF3C3C3C)
+                        : Colors.grey.shade300,
+                width: 1.5,
+              ),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: primary.withOpacity(0.25),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : [],
+            ),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight:
+                    isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected
+                    ? Colors.white
+                    : isDark
+                        ? Colors.white70
+                        : Colors.grey.shade700,
+                letterSpacing: 0.1,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -302,11 +406,13 @@ class _DollarTypeFilter extends StatelessWidget {
 // ─── Filtro rango de tiempo ───────────────────────────────────────────────────
 
 class _TimeRangeFilter extends StatelessWidget {
+  final List<TimeRange> ranges;
   final TimeRange selected;
   final ValueChanged<TimeRange> onChanged;
   final AppLocalizations l10n;
 
   const _TimeRangeFilter({
+    required this.ranges,
     required this.selected,
     required this.onChanged,
     required this.l10n,
@@ -329,7 +435,7 @@ class _TimeRangeFilter extends StatelessWidget {
           ),
         ),
         child: Row(
-          children: TimeRange.values.map((range) {
+          children: ranges.map((range) {
             final isSelected = selected == range;
             return Expanded(
               child: GestureDetector(
@@ -347,7 +453,7 @@ class _TimeRangeFilter extends StatelessWidget {
                     range.label(l10n),
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight:
                           isSelected ? FontWeight.w700 : FontWeight.w500,
                       color: isSelected
@@ -374,12 +480,14 @@ class _ChartArea extends StatefulWidget {
   final HistoricalDollarType type;
   final TimeRange range;
   final AppLocalizations l10n;
+  final String footerText;
 
   const _ChartArea({
     required this.serie,
     required this.type,
     required this.range,
     required this.l10n,
+    required this.footerText,
   });
 
   @override
@@ -403,21 +511,31 @@ class _ChartAreaState extends State<_ChartArea> {
 
     final spots = <FlSpot>[];
     for (var i = 0; i < widget.serie.length; i++) {
-      final v = widget.type == HistoricalDollarType.blue
-          ? widget.serie[i].blueVenta
-          : widget.serie[i].oficialVenta;
+      final v = switch (widget.type) {
+        HistoricalDollarType.blue => widget.serie[i].blueVenta,
+        HistoricalDollarType.oficial => widget.serie[i].oficialVenta,
+        HistoricalDollarType.cripto => widget.serie[i].binanceVenta,
+      };
       if (v != null) {
         spots.add(FlSpot(i.toDouble(), v));
       }
     }
     if (spots.isEmpty) return _EmptyState(l10n: widget.l10n);
 
-    final minX = spots.first.x;
-    final maxX = spots.last.x;
+    final dataMinX = spots.first.x;
+    final dataMaxX = spots.last.x;
+    final spanData = dataMaxX - dataMinX;
+    // Margen horizontal en espacio de índices: 4 % del span, mín. 0.5 puntos.
+    // Sin tope superior → series largas (años) siguen teniendo ~12–15 px físicos de margen.
+    final padX = spanData <= 0 ? 0.5 : (spanData * 0.04).clamp(0.5, double.infinity);
+    final chartMinX = dataMinX - padX;
+    final chartMaxX = dataMaxX + padX;
 
-    final lineColor = widget.type == HistoricalDollarType.blue
-        ? AppTheme.primaryBlue
-        : const Color(0xFF1A8B73);
+    final lineColor = switch (widget.type) {
+      HistoricalDollarType.blue => AppTheme.primaryBlue,
+      HistoricalDollarType.oficial => const Color(0xFF1A8B73),
+      HistoricalDollarType.cripto => _historicoCriptoLineColor,
+    };
 
     // Calcular estadísticas para la tarjeta de resumen
     final lastValue = values.last;
@@ -425,6 +543,10 @@ class _ChartAreaState extends State<_ChartArea> {
     final changeAbs = lastValue - firstValue;
     final changePct = firstValue != 0 ? (changeAbs / firstValue) * 100 : 0.0;
     final isPositive = changeAbs >= 0;
+
+    final todoSingleCalendarYear = widget.range == TimeRange.all &&
+        widget.serie.isNotEmpty &&
+        widget.serie.first.date.year == widget.serie.last.date.year;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -446,21 +568,19 @@ class _ChartAreaState extends State<_ChartArea> {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final chartW = constraints.maxWidth.isFinite
-                    ? constraints.maxWidth
-                    : 360.0;
-                final bottomTitleInterval = _bottomTitleInterval(
-                  range: widget.range,
-                  legacyPointCount: spots.length.toDouble(),
-                  minX: minX,
-                  maxX: maxX,
-                  chartWidth: chartW,
+                // 4 etiquetas fijas repartidas sobre el tramo real de la serie.
+                // interval:1 → fl_chart pregunta por cada índice entero;
+                // el Set decide cuáles se muestran.
+                final labelIndices = _evenlySpacedIndicesInclusive(
+                  dataMinX.round(),
+                  dataMaxX.round(),
+                  4,
                 );
-                return LineChart(
+                final chart = LineChart(
                   duration: const Duration(milliseconds: 300),
                   LineChartData(
-                minX: minX,
-                maxX: maxX,
+                minX: chartMinX,
+                maxX: chartMaxX,
                 minY: bottomY,
                 maxY: topY,
                 clipData: const FlClipData.all(),
@@ -487,20 +607,28 @@ class _ChartAreaState extends State<_ChartArea> {
                   ),
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 28,
-                      interval: bottomTitleInterval,
-                      getTitlesWidget: (value, meta) => _bottomTitle(
-                        value,
-                        meta,
-                        widget.serie,
-                        widget.range,
-                        isDark,
-                      ),
+                      showTitles: !todoSingleCalendarYear,
+                      reservedSize: todoSingleCalendarYear ? 8 : 28,
+                      interval: 1,
+                      getTitlesWidget: (value, meta) {
+                        final roundedIdx = value.round();
+                        if (!labelIndices.contains(roundedIdx)) {
+                          return const SizedBox.shrink();
+                        }
+                        return _bottomTitle(
+                          value,
+                          widget.serie,
+                          widget.range,
+                          isDark,
+                        );
+                      },
                     ),
                   ),
                   rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(
+                        showTitles: false,
+                        reservedSize: 20,
+                      )),
                   topTitles: const AxisTitles(
                       sideTitles: SideTitles(showTitles: false)),
                 ),
@@ -597,13 +725,34 @@ class _ChartAreaState extends State<_ChartArea> {
                 ],
               ),
                 );
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: chart),
+                    if (todoSingleCalendarYear)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          '${widget.serie.first.date.year}',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: isDark
+                                ? Colors.white38
+                                : Colors.grey.shade500,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
               },
             ),
           ),
           const SizedBox(height: 8),
           // ── Fuente de datos ────────────────────────────────────────────
           Text(
-            widget.l10n.dataSourceFooter,
+            widget.footerText,
             style: TextStyle(
               fontSize: 11,
               fontStyle: FontStyle.italic,
@@ -619,9 +768,11 @@ class _ChartAreaState extends State<_ChartArea> {
 
   List<double> _getValues() {
     return widget.serie
-        .map((r) => widget.type == HistoricalDollarType.blue
-            ? r.blueVenta
-            : r.oficialVenta)
+        .map((r) => switch (widget.type) {
+              HistoricalDollarType.blue => r.blueVenta,
+              HistoricalDollarType.oficial => r.oficialVenta,
+              HistoricalDollarType.cripto => r.binanceVenta,
+            })
         .whereType<double>()
         .toList();
   }
@@ -644,63 +795,25 @@ class _ChartAreaState extends State<_ChartArea> {
     return 100000;
   }
 
-  static double _bottomInterval(double count) {
-    if (count <= 14) return 2;
-    if (count <= 60) return 10;
-    if (count <= 180) return 30;
-    if (count <= 400) return 60;
-    if (count <= 800) return 120;
-    return 365;
-  }
-
-  /// Intervalo en el eje X para rangos largos: limita la cantidad de etiquetas según el ancho
-  /// útil del gráfico (evita solapamiento en celular).
-  static double _bottomTitleInterval({
-    required TimeRange range,
-    required double legacyPointCount,
-    required double minX,
-    required double maxX,
-    required double chartWidth,
-  }) {
-    final span = maxX - minX;
-    if (span <= 0) return 1;
-
-    if (range == TimeRange.week7 || range == TimeRange.month1) {
-      return _bottomInterval(legacyPointCount);
+  /// 4 índices repartidos uniformemente entre [minI] y [maxI] (ambos inclusive).
+  static Set<int> _evenlySpacedIndicesInclusive(
+    int minI,
+    int maxI,
+    int targetCount,
+  ) {
+    final out = <int>{};
+    if (maxI < minI) return out;
+    final span = maxI - minI;
+    if (span == 0) {
+      out.add(minI);
+      return out;
     }
-
-    const leftAxis = 58.0;
-    const horizontalPadding = 24.0;
-    final plotW =
-        (chartWidth - leftAxis - horizontalPadding).clamp(72.0, 2000.0);
-
-    final double minPxPerLabel;
-    int minLabels;
-    int maxLabelsCap;
-    if (range == TimeRange.month3) {
-      // 3M: pocas marcas; "MMM yy" se pisa fácil en celular
-      minPxPerLabel = 76;
-      minLabels = 3;
-      maxLabelsCap = 4;
-    } else if (range == TimeRange.year1) {
-      minPxPerLabel = 52;
-      minLabels = 4;
-      maxLabelsCap = 6;
-    } else if (range == TimeRange.year5 || range == TimeRange.all) {
-      minPxPerLabel = 42;
-      minLabels = 4;
-      maxLabelsCap = 6;
-    } else {
-      minPxPerLabel = 48;
-      minLabels = 4;
-      maxLabelsCap = 6;
+    final n = targetCount.clamp(2, span + 1);
+    for (var k = 0; k < n; k++) {
+      final idx = minI + ((k * span) / (n - 1)).round();
+      out.add(idx.clamp(minI, maxI));
     }
-
-    var maxLabels = (plotW / minPxPerLabel).floor();
-    maxLabels = maxLabels.clamp(minLabels, maxLabelsCap);
-
-    final step = (span / maxLabels).ceilToDouble();
-    return step < 1 ? 1 : step;
+    return out;
   }
 
   static Widget _leftTitle(
@@ -729,42 +842,38 @@ class _ChartAreaState extends State<_ChartArea> {
     );
   }
 
-  static Widget _bottomTitle(double value, TitleMeta meta,
-      List<HistoricalRate> serie, TimeRange range, bool isDark) {
-    final idx = value.toInt();
+  /// Formatea la etiqueta del eje X según la amplitud real de la serie mostrada.
+  /// [isFirst] / [isLast] controlan la alineación para que el texto no quede
+  /// cortado contra los bordes del gráfico.
+  static Widget _bottomTitle(
+    double value,
+    List<HistoricalRate> serie,
+    TimeRange range,
+    bool isDark,
+  ) {
+    final idx = value.round();
     if (idx < 0 || idx >= serie.length) return const SizedBox.shrink();
 
-    // Evita dos ticks con el mismo "MMM yy" (típico en 3M con intervalo fino)
-    if (range == TimeRange.month3 || range == TimeRange.year1) {
-      final interval = meta.appliedInterval;
-      if (interval > 0) {
-        final prevTick = value - interval;
-        if (prevTick >= meta.min - 1e-6) {
-          final prevIdx = prevTick.round();
-          if (prevIdx >= 0 && prevIdx < serie.length) {
-            final dCurr = serie[idx].date;
-            final dPrev = serie[prevIdx].date;
-            if (dCurr.year == dPrev.year && dCurr.month == dPrev.month) {
-              return const SizedBox.shrink();
-            }
-          }
-        }
-      }
-    }
-
+    final first = serie.first.date;
+    final last = serie.last.date;
+    final spanDays = last.difference(first).inDays.abs();
     final date = serie[idx].date;
-    String label;
-    if (range == TimeRange.week7 || range == TimeRange.month1) {
+
+    // Formato según la amplitud real del tramo visible:
+    //  ≤ 90 días  → "d MMM"   (p. ej. "24 mar")
+    //  ≤ 730 días → "MMM yy"  (p. ej. "mar 26")
+    //  > 730 días → "yyyy"    (p. ej. "2023")
+    final String label;
+    if (spanDays <= 90) {
       label = DateFormat('d MMM', 'es').format(date);
-    } else if (range == TimeRange.month3 || range == TimeRange.year1) {
+    } else if (spanDays <= 730) {
       label = DateFormat('MMM yy', 'es').format(date);
     } else {
       label = DateFormat('yyyy', 'es').format(date);
     }
-    return SideTitleWidget(
-      axisSide: meta.axisSide,
-      space: 4,
-      fitInside: SideTitleFitInsideData.fromTitleMeta(meta, enabled: true),
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
       child: Text(
         label,
         style: TextStyle(
@@ -840,9 +949,11 @@ class _SummaryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  type == HistoricalDollarType.blue
-                      ? l10n.historicosBlue
-                      : l10n.historicosOficial,
+                  switch (type) {
+                    HistoricalDollarType.blue => l10n.historicosBlue,
+                    HistoricalDollarType.oficial => l10n.historicosOficial,
+                    HistoricalDollarType.cripto => l10n.historicosCripto,
+                  },
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
@@ -879,7 +990,7 @@ class _SummaryCard extends StatelessWidget {
                   Icon(changeIcon, size: 14, color: changeColor),
                   const SizedBox(width: 2),
                   Text(
-                    '${changePct.abs().toStringAsFixed(1)}%',
+                    _formatChangePct(changePct),
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
@@ -916,6 +1027,11 @@ class _SummaryCard extends StatelessWidget {
       return '$sign\$${NumberFormat('#,##0', 'es_AR').format(v)}';
     }
     return '$sign\$${NumberFormat('#,##0.00', 'es_AR').format(v)}';
+  }
+
+  /// Dos decimales y separador local; evita "0,0 %" en variaciones muy chicas.
+  static String _formatChangePct(double pct) {
+    return '${NumberFormat('#0.00', 'es_AR').format(pct.abs())}%';
   }
 }
 

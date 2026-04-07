@@ -306,6 +306,19 @@ class AppLocalizations {
     }
   }
 
+  String get linkFacebookLabel {
+    switch (_lang) {
+      case 'en':
+        return 'Facebook';
+      case 'it':
+        return 'Facebook';
+      case 'de':
+        return 'Facebook';
+      default:
+        return 'Facebook';
+    }
+  }
+
   String dollarTypeName(DollarType type) {
     switch (_lang) {
       case 'en':
@@ -1150,6 +1163,19 @@ class AppLocalizations {
     }
   }
 
+  String get historicosCripto {
+    switch (_lang) {
+      case 'en':
+        return 'Crypto Dollar';
+      case 'it':
+        return 'Dollaro Cripto';
+      case 'de':
+        return 'Krypto-Dollar';
+      default:
+        return 'Dólar Cripto';
+    }
+  }
+
   String get historicosChangeLabel {
     switch (_lang) {
       case 'en':
@@ -1186,6 +1212,15 @@ class AppLocalizations {
     }
   }
 
+  String get range15d {
+    switch (_lang) {
+      case 'en':
+        return '15D';
+      default:
+        return '15D';
+    }
+  }
+
   String get range1m {
     switch (_lang) {
       case 'en':
@@ -1201,6 +1236,15 @@ class AppLocalizations {
         return '3M';
       default:
         return '3M';
+    }
+  }
+
+  String get range2m {
+    switch (_lang) {
+      case 'en':
+        return '2M';
+      default:
+        return '2M';
     }
   }
 
